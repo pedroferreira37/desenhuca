@@ -1,4 +1,4 @@
-import type { Point } from './types';
+import type { DesenhucaShape, Point } from './types';
 
 export class AABB {
 	x: number;
@@ -46,7 +46,7 @@ export class QuadTree {
 	}
 
 	insert(shape: DesenhucaShape): boolean {
-		const points = shape.coords();
+		const points = shape.dimensions();
 
 		if (!points.every((p) => this.boundary.contains(p))) {
 			return false;
@@ -108,7 +108,7 @@ export class QuadTree {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
-			const points = shape.coords();
+			const points = shape.dimensions();
 
 			if (points.every((p) => range.contains(p))) {
 				found.push(shape);

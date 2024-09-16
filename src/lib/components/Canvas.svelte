@@ -31,18 +31,20 @@
 	const shapes: DesenhucaShape[] = $state([]);
 
 	let mouse = $state({ x: 0, y: 0 });
+	let offset = $state({ x: 0, y: 0 });
 
 	let target: DesenhucaShape | null = $state(null);
 
 	let intersecting: boolean = $state(false);
 
-	const clean_canvas = () => context.clearRect(0, 0, canvas.width, canvas.height);
+	const flush = () => context.clearRect(0, 0, canvas.width, canvas.height);
 
-	const redraw = () => {
+	function flush_n_redraw() {
+		flush();
 		for (let i = 0; i < shapes.length; i++) {
 			shapes[i].draw(rough);
 		}
-	};
+	}
 
 	function onpointerdown(event: PointerEvent) {
 		const x = event.offsetX * devicePixelRatio;
@@ -52,13 +54,15 @@
 
 		switch (mode) {
 			case 'select':
-				if (!target && !intersecting) {
-					clean_canvas();
-					redraw();
-				}
+				flush_n_redraw();
 
-				if (intersecting) {
+				if (intersecting && target) {
+					offset = { x: x - target.x, y: y - target.y };
 					drag();
+					flush_n_redraw();
+					target.draw(rough);
+					target.highlight(rough);
+
 					return;
 				}
 
@@ -103,10 +107,9 @@
 				}
 
 				if (dragging && target) {
-					clean_canvas();
-					redraw();
+					flush_n_redraw();
 
-					target.move(x, y);
+					target.move(x, y, offset.x, offset.y);
 					target.draw(rough);
 					target.highlight(rough);
 
@@ -131,8 +134,7 @@
 				const shape = shapes.at(-1);
 
 				if (shape) {
-					clean_canvas();
-					redraw();
+					flush_n_redraw();
 
 					shape.resize(x, y);
 					shape.draw(rough);
@@ -151,6 +153,8 @@
 		if (shape) {
 			qtree.insert(shape);
 		}
+
+		target = null;
 	}
 
 	$effect(() => {

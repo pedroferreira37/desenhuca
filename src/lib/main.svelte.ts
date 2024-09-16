@@ -25,9 +25,9 @@ export class Rectangle implements DesenhucaShape {
 		this.options = options || {};
 	}
 
-	move(x: number, y: number): void {
-		this.x += x - this.x;
-		this.y += y - this.y;
+	move(x: number, y: number, offset_x: number, offset_y: number): void {
+		this.x = x - offset_x;
+		this.y = y - offset_y;
 	}
 
 	resize(x: number, y: number): void {
@@ -37,12 +37,6 @@ export class Rectangle implements DesenhucaShape {
 
 	draw(rough: RoughCanvas): void {
 		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
-
-		// rough.rectangle(this.x - 10, this.y - 10, this.width + 10, this.height + 10, options);
-		// rough.rectangle(this.x - 15, this.y - 15, size, size, options);
-		// rough.rectangle(this.width + this.x + 5, this.y - 15, size, size, options);
-		// rough.rectangle(this.x - 15, this.height + this.y + 5, size, size, options);
-		// rough.rectangle(this.width + this.x + 5, this.height + this.y + 5, size, size, options);
 	}
 
 	customize(options: DesenhucaShapeOptions): void {
@@ -67,7 +61,7 @@ export class Rectangle implements DesenhucaShape {
 		);
 	}
 
-	coords(): Point[] {
+	dimensions(): Point[] {
 		return [
 			{ x: this.x, y: this.y },
 			{ x: this.x + this.width, y: this.y + this.height }
