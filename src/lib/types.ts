@@ -5,12 +5,12 @@ import type { ShapeKind } from './consts';
 export interface DesenhucaShape {
 	x: number;
 	y: number;
-	customize(options: DesenhucaShapeOptions): void;
-	move(x: number, y: number, offset_x: number, offset_y: number): void;
+	customize(options: RoughOptions): void;
+	move(x: number, y: number, offset: Point): void;
 	resize(x: number, y: number): void;
 	draw(rough: RoughCanvas): void;
-	intersects(point: Point): boolean;
-	contains(point: Point): boolean;
+	intersects(x: number, y: number): boolean;
+	contains(x: number, y: number): boolean;
 	dimensions(): Point[];
 	highlight(rough: RoughCanvas): void;
 }
@@ -20,7 +20,9 @@ export interface Point {
 	y: number;
 }
 
-export type DesenhucaShapeOptions = Partial<Options>;
+type Obligatory<T, K extends keyof T> = T & { [P in K]-?: T[K] };
+
+export type RoughOptions = Obligatory<Options, 'strokeWidth'>;
 
 export type DesenhucaShapeType = (typeof ShapeKind)[keyof typeof ShapeKind];
 export type DesenhucaMode = 'select' | 'free-hand-draw' | 'erase' | 'pan' | DesenhucaShapeType;

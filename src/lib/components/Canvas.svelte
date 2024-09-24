@@ -1,13 +1,15 @@
 <script lang="ts">
-	import { create_shape } from '$lib/main.svelte';
-	import { AABB, QuadTree } from '$lib/qudtree';
-	import type { DesenhucaMode, DesenhucaShape } from '$lib/types';
+	import { create_shape } from '$lib/shape.svelte';
+	import { AABB, QuadTree } from '$lib/qtree';
+	import type { DesenhucaMode, DesenhucaShape, RoughOptions } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { RoughGenerator } from 'roughjs/bin/generator';
+	import { BoundingBox } from '$lib/selection-box.svelte';
 
 	type Props = {
 		mode: DesenhucaMode;
+		resizing: boolean;
 		drawing: boolean;
 		selecting: boolean;
 		dragging: boolean;
@@ -15,9 +17,11 @@
 		select: () => void;
 		drag: () => void;
 		defer: () => void;
+		resize: () => void;
 	};
 
-	let { mode, drawing, selecting, dragging, draw, select, drag, defer }: Props = $props();
+	let { mode, resizing, drawing, selecting, dragging, resize, draw, select, drag, defer }: Props =
+		$props();
 
 	let canvas: HTMLCanvasElement;
 	let context: CanvasRenderingContext2D;
@@ -29,21 +33,27 @@
 	const dpr = window.devicePixelRatio;
 
 	const shapes: DesenhucaShape[] = $state([]);
+	let shape: DesenhucaShape | null = $state(null);
 
 	let mouse = $state({ x: 0, y: 0 });
 	let offset = $state({ x: 0, y: 0 });
+	let options: RoughOptions = $state({
+		seed: 10,
+		roughness: 4,
+		strokeWidth: 4
+	});
+
+	const box = new BoundingBox();
 
 	let target: DesenhucaShape | null = $state(null);
 
-	let intersecting: boolean = $state(false);
+	let is_cursor_move: boolean = $state(false);
+	let is_cursor_ew_resize: boolean = $state(false);
+	let is_cursor_nwse_resize: boolean = $state(false);
 
-	const flush = () => context.clearRect(0, 0, canvas.width, canvas.height);
-
-	function flush_n_redraw() {
-		flush();
-		for (let i = 0; i < shapes.length; i++) {
-			shapes[i].draw(rough);
-		}
+	function flush_and_redraw() {
+		context.clearRect(0, 0, canvas.width, canvas.height);
+		shapes.forEach((shape) => shape.draw(rough));
 	}
 
 	function onpointerdown(event: PointerEvent) {
@@ -52,37 +62,46 @@
 
 		mouse = { x, y };
 
-		switch (mode) {
-			case 'select':
-				flush_n_redraw();
+		if (mode)
+			switch (mode) {
+				case 'select':
+					if (box.contains(x, y)) {
+						const rect = box.get_rect();
+						offset = { x: x - rect.x, y: y - rect.y };
+						drag();
+						return;
+					}
 
-				if (intersecting && target) {
-					offset = { x: x - target.x, y: y - target.y };
-					drag();
-					flush_n_redraw();
-					target.draw(rough);
-					target.highlight(rough);
+					if (box.intersects_path(x, y)) {
+						resize();
+						box.resize(x, y);
+						return;
+					}
 
-					return;
-				}
+					if (!box.empty() || (!box.intersects_path(x, y) && !target)) {
+						select();
+						flush_and_redraw();
+						box.clean();
+						return;
+					} else {
+						box.add(target as DesenhucaShape);
 
-				select();
+						box.draw(rough);
+						is_cursor_ew_resize = is_cursor_nwse_resize = is_cursor_move = false;
+					}
 
-				break;
-			case 'rectangle':
-			case 'ellipse':
-			case 'line':
-				draw();
+					break;
+				case 'rectangle':
+				case 'ellipse':
+				case 'line':
+					draw();
 
-				const shape = create_shape(mode, x, y, 0, 0, {
-					seed: 10,
-					roughness: 4,
-					strokeWidth: 4
-				});
+					box.clean();
 
-				shapes.push(shape);
-				break;
-		}
+					shape = create_shape(mode, x, y, 0, 0, options);
+
+					break;
+			}
 	}
 
 	function onpointermove(event: PointerEvent) {
@@ -93,48 +112,54 @@
 
 		switch (mode) {
 			case 'select':
+				if (resizing) {
+					flush_and_redraw();
+					box.resize(x, y);
+					return;
+				}
+
 				if (selecting) {
 					const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
 
 					qtree.query_by_range(range, found);
 
-					if (!found.length) return;
+					box.add(found);
+				} else if (dragging) {
+					flush_and_redraw();
 
-					target = found[0];
-					target.highlight(rough);
+					if (box.contains(x, y)) {
+						box.move(x, y, offset);
+					}
 
-					return;
+					// target.move(x, y, offset);
+					// target.draw(rough);
+					// target.highlight(rough);
+				} else {
+					target = qtree.query_by_point(x, y, found)[0];
+
+					if (target && box.empty()) {
+						is_cursor_move = true;
+						is_cursor_nwse_resize = is_cursor_ew_resize = false;
+					} else if (box.intersects_path(x, y)) {
+						is_cursor_ew_resize = true;
+						is_cursor_nwse_resize = is_cursor_move = false;
+					} else if (box.contains(x, y)) {
+						is_cursor_ew_resize = is_cursor_nwse_resize = false;
+						is_cursor_move = true;
+						console.log('and here');
+					} else {
+						is_cursor_move = is_cursor_ew_resize = is_cursor_nwse_resize = false;
+					}
 				}
 
-				if (dragging && target) {
-					flush_n_redraw();
-
-					target.move(x, y, offset.x, offset.y);
-					target.draw(rough);
-					target.highlight(rough);
-
-					return;
-				}
-
-				qtree.query_by_point({ x, y }, found);
-				target = found[0];
-
-				if (target) {
-					intersecting = true;
-					return;
-				}
-
-				intersecting = false;
 				break;
 			case 'rectangle':
 			case 'ellipse':
 			case 'line':
 				if (!drawing) return;
 
-				const shape = shapes.at(-1);
-
 				if (shape) {
-					flush_n_redraw();
+					flush_and_redraw();
 
 					shape.resize(x, y);
 					shape.draw(rough);
@@ -148,12 +173,15 @@
 	function onpointerup(event: PointerEvent) {
 		defer();
 
-		const shape = shapes.at(-1);
-
 		if (shape) {
 			qtree.insert(shape);
+			box.add(shape);
+			is_cursor_ew_resize = is_cursor_nwse_resize = is_cursor_move = false;
 		}
 
+		box.draw(rough);
+
+		shape = null;
 		target = null;
 	}
 
@@ -184,7 +212,13 @@
 	height={window.innerHeight}
 	class:cursor-crosshair={drawing &&
 		(mode === 'free-hand-draw' || mode === 'rectangle' || mode === 'ellipse' || mode === 'line')}
-	class:cursor-move={intersecting}
+	class:cursor-move={is_cursor_move}
+	class:cursor-ew-resize={is_cursor_ew_resize}
+	class:cursor-nwse-resize={is_cursor_nwse_resize}
+	class:cursor-default={!drawing &&
+		!is_cursor_move &&
+		!is_cursor_ew_resize &&
+		!is_cursor_nwse_resize}
 	{onpointerdown}
 	{onpointermove}
 	{onpointerup}

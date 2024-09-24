@@ -13,10 +13,8 @@ export class AABB {
 		this.height = height;
 	}
 
-	contains(p: Point): boolean {
-		return (
-			p.x >= this.x && p.x <= this.x + this.width && p.y >= this.y && p.y <= this.y + this.height
-		);
+	contains(x: number, y: number): boolean {
+		return x >= this.x && x <= this.x + this.width && y >= this.y && y <= this.y + this.height;
 	}
 
 	intersects(range: AABB): boolean {
@@ -48,7 +46,7 @@ export class QuadTree {
 	insert(shape: DesenhucaShape): boolean {
 		const points = shape.dimensions();
 
-		if (!points.every((p) => this.boundary.contains(p))) {
+		if (!points.every((p) => this.boundary.contains(p.x, p.y))) {
 			return false;
 		}
 
@@ -87,18 +85,20 @@ export class QuadTree {
 		this.divided = true;
 	}
 
-	query_by_point(point: Point, found: DesenhucaShape[]) {
-		if (!this.boundary.contains(point)) return found;
+	query_by_point(x: number, y: number, found: DesenhucaShape[] = []) {
+		if (!this.boundary.contains(x, y)) return found;
 
 		for (const shape of this.shapes) {
-			if (shape.intersects(point)) found.push(shape);
+			const points = shape.dimensions();
+
+			if (shape.intersects(x, y)) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.query_by_point(point, found);
-			this.northeast!.query_by_point(point, found);
-			this.southwest!.query_by_point(point, found);
-			this.southeast!.query_by_point(point, found);
+			this.northwest!.query_by_point(x, y);
+			this.northeast!.query_by_point(x, y);
+			this.southwest!.query_by_point(x, y);
+			this.southeast!.query_by_point(x, y);
 		}
 
 		return found;
@@ -110,9 +110,7 @@ export class QuadTree {
 		for (const shape of this.shapes) {
 			const points = shape.dimensions();
 
-			if (points.every((p) => range.contains(p))) {
-				found.push(shape);
-			}
+			if (points.every((p) => range.contains(p.x, p.y))) found.push(shape);
 		}
 
 		if (this.divided) {

@@ -9,6 +9,7 @@
 	let drawing: boolean = $state(false);
 	let selecting: boolean = $state(false);
 	let dragging: boolean = $state(false);
+	let resizing: boolean = $state(false);
 
 	let prev_mouse = $state({ x: 0, y: 0 });
 	let mouse = $state({ x: 0, y: 0 });
@@ -60,6 +61,7 @@
 		{/if}
 
 		<Canvas
+			{resizing}
 			{mode}
 			{drawing}
 			{selecting}
@@ -67,11 +69,13 @@
 			draw={() => (drawing = true)}
 			select={() => (selecting = true)}
 			drag={() => (dragging = true)}
+			resize={() => (resizing = true)}
 			defer={() => {
 				mode = 'select';
 				drawing = false;
 				selecting = false;
 				dragging = false;
+				resizing = false;
 			}}
 		/>
 	</div>

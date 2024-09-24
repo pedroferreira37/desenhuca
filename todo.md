@@ -1,9 +1,11 @@
 Needs:
 
-    - [X] Add shapes
-    - [X] Select shapes
-    - [X] Move shapes
-    - [X] Resize shapes
+    - [✅] Add shapes
+    - [✅] Select shapes
+    - [✅] Move shapes
+    - [ ] Resize shapes
+        - The resize must acquaintance the selection box
+        - The resize must acquaintance the fill of the shape
     - [ ] Rotate shapes
     - [ ] Delete shapes
     - [ ] Undo/Redo
