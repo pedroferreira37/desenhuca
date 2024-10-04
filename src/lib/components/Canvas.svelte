@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { create_shape } from '$lib/shape.svelte';
 	import { AABB, QuadTree } from '$lib/qtree';
-	import type { DesenhucaMode, DesenhucaShape, RoughOptions } from '$lib/types';
+	import type { Shape, RoughOptions, Tools, CursorStyle } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { RoughGenerator } from 'roughjs/bin/generator';
 	import { BoundingBox } from '$lib/selection-box.svelte';
 
 	type Props = {
-		mode: DesenhucaMode;
-		resizing: boolean;
+		tool: Tools;
+		behavior: 'drag' | 'resize' | 'none';
+		cursor_style: CursorStyle;
 		drawing: boolean;
 		selecting: boolean;
-		dragging: boolean;
 		draw: () => void;
 		select: () => void;
 		drag: () => void;
@@ -20,8 +20,18 @@
 		resize: () => void;
 	};
 
-	let { mode, resizing, drawing, selecting, dragging, resize, draw, select, drag, defer }: Props =
-		$props();
+	let {
+		tool,
+		behavior,
+		cursor_style = $bindable(),
+		selecting,
+		drawing,
+		resize,
+		draw,
+		select,
+		drag,
+		defer
+	}: Props = $props();
 
 	let canvas: HTMLCanvasElement;
 	let context: CanvasRenderingContext2D;
@@ -32,26 +42,26 @@
 
 	const dpr = window.devicePixelRatio;
 
-	const shapes: DesenhucaShape[] = $state([]);
-	let shape: DesenhucaShape | null = $state(null);
+	const shapes: Shape[] = $state([]);
+	let shape: Shape | null = $state(null);
 
 	let mouse = $state({ x: 0, y: 0 });
-	let offset = $state({ x: 0, y: 0 });
+
 	let options: RoughOptions = $state({
 		seed: 10,
 		roughness: 4,
 		strokeWidth: 4
 	});
 
-	const box = new BoundingBox();
+	const box = new BoundingBox({
+		stroke: 'rgba(137, 196, 244, 1)',
+		strokeWidth: 4,
+		roughness: 0
+	});
 
-	let target: DesenhucaShape | null = $state(null);
+	let target: Shape | null = $state(null);
 
-	let is_cursor_move: boolean = $state(false);
-	let is_cursor_ew_resize: boolean = $state(false);
-	let is_cursor_nwse_resize: boolean = $state(false);
-
-	function flush_and_redraw() {
+	function refresh() {
 		context.clearRect(0, 0, canvas.width, canvas.height);
 		shapes.forEach((shape) => shape.draw(rough));
 	}
@@ -62,104 +72,103 @@
 
 		mouse = { x, y };
 
-		if (mode)
-			switch (mode) {
-				case 'select':
-					if (box.contains(x, y)) {
-						const rect = box.get_rect();
-						offset = { x: x - rect.x, y: y - rect.y };
-						drag();
-						return;
-					}
-
-					if (box.intersects_path(x, y)) {
-						resize();
-						box.resize(x, y);
-						return;
-					}
-
-					if (!box.empty() || (!box.intersects_path(x, y) && !target)) {
-						select();
-						flush_and_redraw();
-						box.clean();
-						return;
-					} else {
-						box.add(target as DesenhucaShape);
-
-						box.draw(rough);
-						is_cursor_ew_resize = is_cursor_nwse_resize = is_cursor_move = false;
-					}
-
-					break;
-				case 'rectangle':
-				case 'ellipse':
-				case 'line':
-					draw();
-
-					box.clean();
-
-					shape = create_shape(mode, x, y, 0, 0, options);
-
-					break;
-			}
-	}
-
-	function onpointermove(event: PointerEvent) {
-		const x = event.offsetX * devicePixelRatio;
-		const y = event.offsetY * devicePixelRatio;
-
-		const found: DesenhucaShape[] = [];
-
-		switch (mode) {
-			case 'select':
-				if (resizing) {
-					flush_and_redraw();
-					box.resize(x, y);
-					return;
-				}
-
-				if (selecting) {
-					const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
-
-					qtree.query_by_range(range, found);
-
-					box.add(found);
-				} else if (dragging) {
-					flush_and_redraw();
-
-					if (box.contains(x, y)) {
-						box.move(x, y, offset);
-					}
-
-					// target.move(x, y, offset);
-					// target.draw(rough);
-					// target.highlight(rough);
+		switch (tool) {
+			case 'pointer':
+				if (box.contains(x, y)) {
+					box.update_offset(x, y);
+					drag();
+				} else if (box.intersects(x, y)) {
+					resize();
 				} else {
-					target = qtree.query_by_point(x, y, found)[0];
+					box.clean();
+					refresh();
+					select();
 
-					if (target && box.empty()) {
-						is_cursor_move = true;
-						is_cursor_nwse_resize = is_cursor_ew_resize = false;
-					} else if (box.intersects_path(x, y)) {
-						is_cursor_ew_resize = true;
-						is_cursor_nwse_resize = is_cursor_move = false;
-					} else if (box.contains(x, y)) {
-						is_cursor_ew_resize = is_cursor_nwse_resize = false;
-						is_cursor_move = true;
-						console.log('and here');
-					} else {
-						is_cursor_move = is_cursor_ew_resize = is_cursor_nwse_resize = false;
+					const found: Shape[] = [];
+
+					qtree.query_by_point(x, y, found);
+
+					const [target] = found;
+
+					if (target) {
+						box.add(target);
+						box.draw(rough);
 					}
+
+					cursor_style = 'default';
 				}
 
 				break;
 			case 'rectangle':
 			case 'ellipse':
 			case 'line':
-				if (!drawing) return;
+				draw();
 
+				box.clean();
+
+				shape = create_shape(tool, x, y, 0, 0, options);
+
+				break;
+		}
+	}
+
+	function onpointermove(event: PointerEvent) {
+		const x = event.offsetX * devicePixelRatio;
+		const y = event.offsetY * devicePixelRatio;
+
+		const found: Shape[] = [];
+
+		switch (tool) {
+			case 'pointer':
+				if (!box.is_empty()) {
+					if (box.contains(x, y)) {
+						cursor_style = 'move';
+					} else if (box.intersects_heights(x, y)) {
+						cursor_style = 'ew-resize';
+					} else if (box.intersects_base(x, y)) {
+						cursor_style = 'ns-resize';
+					} else if (box.intersects_main_diagonal(x, y)) {
+						cursor_style = 'nwse-resize';
+					} else if (box.intersects_secondary_diagonal(x, y)) {
+						cursor_style = 'nesw-resize';
+					} else {
+						cursor_style = 'default';
+					}
+				} else {
+					if (qtree.has(x, y)) {
+						cursor_style = 'move';
+					} else {
+						cursor_style = 'default';
+					}
+				}
+
+				if (selecting) {
+					cursor_style = 'default';
+					const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
+					qtree.query_by_range(range, found);
+					found.forEach((target) => box.add(target));
+				} else {
+					switch (behavior) {
+						case 'resize':
+							refresh();
+							box.update_offset(x, y);
+							box.resize(cursor_style, x, y);
+							box.draw(rough);
+							break;
+						case 'drag':
+							refresh();
+							box.move(x, y);
+							box.draw(rough);
+							break;
+					}
+				}
+				break;
+
+			case 'rectangle':
+			case 'ellipse':
+			case 'line':
 				if (shape) {
-					flush_and_redraw();
+					refresh();
 
 					shape.resize(x, y);
 					shape.draw(rough);
@@ -176,9 +185,9 @@
 		if (shape) {
 			qtree.insert(shape);
 			box.add(shape);
-			is_cursor_ew_resize = is_cursor_nwse_resize = is_cursor_move = false;
 		}
 
+		cursor_style = 'default';
 		box.draw(rough);
 
 		shape = null;
@@ -203,6 +212,8 @@
 		boundary = new AABB(0, 0, canvas.width, canvas.height);
 
 		qtree = new QuadTree(boundary, 4);
+
+		qtree.visualize(context);
 	});
 </script>
 
@@ -210,15 +221,13 @@
 	bind:this={canvas}
 	width={window.innerWidth}
 	height={window.innerHeight}
-	class:cursor-crosshair={drawing &&
-		(mode === 'free-hand-draw' || mode === 'rectangle' || mode === 'ellipse' || mode === 'line')}
-	class:cursor-move={is_cursor_move}
-	class:cursor-ew-resize={is_cursor_ew_resize}
-	class:cursor-nwse-resize={is_cursor_nwse_resize}
-	class:cursor-default={!drawing &&
-		!is_cursor_move &&
-		!is_cursor_ew_resize &&
-		!is_cursor_nwse_resize}
+	class:cursor-crosshair={cursor_style === 'crosshair'}
+	class:cursor-move={cursor_style === 'move'}
+	class:cursor-ew-resize={cursor_style === 'ew-resize'}
+	class:cursor-nwse-resize={cursor_style === 'nwse-resize'}
+	class:cursor-nesw-resize={cursor_style === 'nesw-resize'}
+	class:cursor-ns-resize={cursor_style === 'ns-resize'}
+	class:cursor-default={cursor_style === 'default'}
 	{onpointerdown}
 	{onpointermove}
 	{onpointerup}

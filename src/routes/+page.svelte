@@ -2,47 +2,39 @@
 	import Canvas from '$lib/components/Canvas.svelte';
 	import Lasso from '$lib/components/Lasso.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
-	import type { DesenhucaMode } from '$lib/types';
+	import type { CursorStyle, Tools } from '$lib/types';
 
-	let mode: DesenhucaMode = $state('select');
+	let tool: Tools = $state('pointer');
+	let behavior: 'drag' | 'resize' | 'none' = $state('none');
+
+	let cursor_style: CursorStyle = $state('default');
 
 	let drawing: boolean = $state(false);
 	let selecting: boolean = $state(false);
-	let dragging: boolean = $state(false);
-	let resizing: boolean = $state(false);
 
 	let prev_mouse = $state({ x: 0, y: 0 });
 	let mouse = $state({ x: 0, y: 0 });
 
-	function window_mousedown(event: MouseEvent) {
-		const x = event.offsetX;
-		const y = event.offsetY;
-
-		prev_mouse.x = x;
-		prev_mouse.y = y;
-	}
-
-	function window_mousemove(event: MouseEvent) {
-		const x = event.offsetX;
-		const y = event.offsetY;
-
-		mouse.x = x;
-		mouse.y = y;
+	function is_pointer_evs_blocked(behavior: 'drag' | 'resize' | 'none') {
+		return behavior === 'drag' || behavior === 'resize';
 	}
 </script>
 
 <main class="absolute top-0 left-0 w-full h-full">
 	<div
-		class:pointer-events-none={drawing || selecting || dragging}
+		class:pointer-events-none={drawing || selecting || is_pointer_evs_blocked(behavior)}
 		class="relative flex justify-center w-full h-full overflow-hidden"
 	>
 		<div class="absolute z-10 shadow-sm max-w-full bottom-4">
 			<Toolbar
-				selected={mode}
-				select={() => (mode = 'select')}
-				rectangle={() => (mode = 'rectangle')}
-				ellipse={() => (mode = 'ellipse')}
-				line={() => (mode = 'line')}
+				selected={tool}
+				pointer={() => (tool = 'pointer')}
+				rectangle={() => {
+					tool = 'rectangle';
+					cursor_style = 'crosshair';
+				}}
+				ellipse={() => (tool = 'ellipse')}
+				line={() => (tool = 'line')}
 			/>
 		</div>
 		<!-- <div class="grid">
@@ -50,7 +42,7 @@
 		</div> -->
 	</div>
 	<div class="w-full h-full absolute top-0 left-0">
-		{#if selecting && mode === 'select'}
+		{#if tool === 'pointer' && selecting}
 			<Lasso
 				x={prev_mouse.x}
 				y={prev_mouse.y}
@@ -61,29 +53,46 @@
 		{/if}
 
 		<Canvas
-			{resizing}
-			{mode}
-			{drawing}
+			{tool}
+			{behavior}
 			{selecting}
-			{dragging}
-			draw={() => (drawing = true)}
+			{drawing}
+			bind:cursor_style
 			select={() => (selecting = true)}
-			drag={() => (dragging = true)}
-			resize={() => (resizing = true)}
-			defer={() => {
-				mode = 'select';
-				drawing = false;
+			draw={() => (drawing = true)}
+			drag={() => {
+				behavior = 'drag';
 				selecting = false;
-				dragging = false;
-				resizing = false;
+			}}
+			resize={() => {
+				behavior = 'resize';
+				selecting = false;
+			}}
+			defer={() => {
+				tool = 'pointer';
+				behavior = 'none';
+				selecting = false;
+				drawing = false;
 			}}
 		/>
 	</div>
 </main>
 
 <svelte:window
-	onmousedown={window_mousedown}
-	onmousemove={window_mousemove}
+	onpointerdown={(event) => {
+		const x = event.offsetX;
+		const y = event.offsetY;
+
+		prev_mouse.x = x;
+		prev_mouse.y = y;
+	}}
+	onpointermove={(event) => {
+		const x = event.offsetX;
+		const y = event.offsetY;
+
+		mouse.x = x;
+		mouse.y = y;
+	}}
 	onmouseup={() => {
 		selecting = false;
 	}}

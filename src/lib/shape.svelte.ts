@@ -1,5 +1,5 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { DesenhucaShape, DesenhucaShapeType, RoughOptions } from './types';
+import type { CursorStyle, DesenhucaShape, RoughOptions, ShapeType } from './types';
 import type { Point } from './types';
 import { ShapeKind } from './consts';
 import type { RoughGenerator } from 'roughjs/bin/generator';
@@ -26,9 +26,39 @@ export class Rectangle implements DesenhucaShape {
 		this.y = y - offset.y;
 	}
 
-	resize(x: number, y: number): void {
+	resize(x: number, y: number) {
 		this.width = x - this.x;
 		this.height = y - this.y;
+	}
+
+	resize_proportionally(
+		side: CursorStyle,
+		box_bounds: { x: number; y: number; width: number; height: number },
+		prev_width: number,
+		prev_height: number
+	): void {
+		const rel_left = (this.x - box_bounds.x) / prev_width;
+		const rel_right = (this.x + this.width - box_bounds.x) / prev_width;
+		const rel_top = (this.y - box_bounds.y) / prev_height;
+		const rel_bottom = (this.y + this.height - box_bounds.y) / prev_height;
+
+		switch (side) {
+			case 'ew-resize':
+				this.x = box_bounds.x + rel_left * box_bounds.width;
+				this.width = rel_right * box_bounds.width - rel_left * box_bounds.width;
+				break;
+			case 'nwse-resize':
+				this.x = box_bounds.x + rel_left * box_bounds.width;
+				this.width = rel_right * box_bounds.width - rel_left * box_bounds.width;
+				this.y = box_bounds.y + rel_top * box_bounds.height;
+				this.height = rel_bottom * box_bounds.height - rel_top * box_bounds.height;
+				break;
+			case 'ns-resize':
+				// do nothing for a moment
+				break;
+		}
+		// this.width = x - this.x;
+		// this.height = y - this.y;
 	}
 
 	draw(rough: RoughCanvas): void {
@@ -43,10 +73,16 @@ export class Rectangle implements DesenhucaShape {
 	intersects(x: number, y: number): boolean {
 		const intersects = () => {
 			return (
-				(!(x > this.x + this.width + 5) && x > this.x + this.width - 5) ||
-				(!(x < this.x - 5) && x < this.x + 5) ||
-				(!(y > this.y + this.height + 5) && y > this.y + this.height - 5) ||
-				(!(y < this.y - 5) && y < this.y + 5)
+				(x >= this.x - 5 && x <= this.x + 5 && y >= this.y && y <= this.y + this.height) ||
+				(x >= this.x + this.width - 5 &&
+					x <= this.x + this.width + 5 &&
+					y >= this.y &&
+					y <= this.y + this.height) ||
+				(y >= this.y - 5 && y <= this.y + 5 && x >= this.x && x <= this.x + this.width) ||
+				(y >= this.y + this.height - 5 &&
+					y <= this.y + this.height + 5 &&
+					x >= this.x &&
+					x <= this.x + this.width)
 			);
 		};
 
@@ -64,16 +100,6 @@ export class Rectangle implements DesenhucaShape {
 			{ x: this.x, y: this.y },
 			{ x: this.x + this.width, y: this.y + this.height }
 		];
-	}
-
-	intersectingSelectionBox() {
-		// const box = new SelectionBox()
-		// const shape.highlight(box)
-		/* 
-		   box.insert(shape) 
-		   box.draw(rough)
-		   box.intersects({x, y})
-		*/
 	}
 
 	highlight(rough: RoughCanvas): void {
@@ -132,7 +158,7 @@ export class Rectangle implements DesenhucaShape {
 }
 
 export const create_shape = (
-	type: DesenhucaShapeType,
+	type: ShapeType,
 	x: number,
 	y: number,
 	width: number,
