@@ -1,4 +1,4 @@
-import type { DesenhucaShape, Point } from './types';
+import type { Shape, Point } from './types';
 
 export class AABB {
 	x: number;
@@ -13,10 +13,8 @@ export class AABB {
 		this.height = height;
 	}
 
-	contains(p: Point): boolean {
-		return (
-			p.x >= this.x && p.x <= this.x + this.width && p.y >= this.y && p.y <= this.y + this.height
-		);
+	contains(x: number, y: number): boolean {
+		return x >= this.x && x <= this.x + this.width && y >= this.y && y <= this.y + this.height;
 	}
 
 	intersects(range: AABB): boolean {
@@ -32,7 +30,7 @@ export class AABB {
 export class QuadTree {
 	private readonly boundary: AABB;
 	private readonly capacity: number;
-	private shapes: DesenhucaShape[] = [];
+	private shapes: Shape[] = [];
 	private divided = false;
 
 	private northeast?: QuadTree;
@@ -45,10 +43,10 @@ export class QuadTree {
 		this.capacity = capacity;
 	}
 
-	insert(shape: DesenhucaShape): boolean {
+	insert(shape: Shape): boolean {
 		const points = shape.dimensions();
 
-		if (!points.every((p) => this.boundary.contains(p))) {
+		if (!points.every((p) => this.boundary.contains(p.x, p.y))) {
 			return false;
 		}
 
@@ -87,32 +85,47 @@ export class QuadTree {
 		this.divided = true;
 	}
 
-	query_by_point(point: Point, found: DesenhucaShape[]) {
-		if (!this.boundary.contains(point)) return found;
+	query_by_point(x: number, y: number, found: Shape[] = []) {
+		if (!this.boundary.contains(x, y)) return found;
 
 		for (const shape of this.shapes) {
-			if (shape.intersects(point)) found.push(shape);
+			if (shape.intersects(x, y)) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.query_by_point(point, found);
-			this.northeast!.query_by_point(point, found);
-			this.southwest!.query_by_point(point, found);
-			this.southeast!.query_by_point(point, found);
+			this.northwest!.query_by_point(x, y, found);
+			this.northeast!.query_by_point(x, y, found);
+			this.southwest!.query_by_point(x, y, found);
+			this.southeast!.query_by_point(x, y, found);
 		}
 
 		return found;
 	}
 
-	query_by_range(range: AABB, found: DesenhucaShape[] = []): DesenhucaShape[] {
+	has(x: number, y: number): boolean {
+		for (const shape of this.shapes) {
+			if (shape.intersects(x, y)) return true;
+		}
+
+		if (this.divided) {
+			return (
+				this.northwest!.has(x, y) ||
+				this.northeast!.has(x, y) ||
+				this.southwest!.has(x, y) ||
+				this.southeast!.has(x, y)
+			);
+		}
+
+		return false;
+	}
+
+	query_by_range(range: AABB, found: Shape[] = []): Shape[] {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
 			const points = shape.dimensions();
 
-			if (points.every((p) => range.contains(p))) {
-				found.push(shape);
-			}
+			if (points.every((p) => range.contains(p.x, p.y))) found.push(shape);
 		}
 
 		if (this.divided) {

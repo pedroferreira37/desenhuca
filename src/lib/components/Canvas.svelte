@@ -1,23 +1,37 @@
 <script lang="ts">
-	import { create_shape } from '$lib/main.svelte';
-	import { AABB, QuadTree } from '$lib/qudtree';
-	import type { DesenhucaMode, DesenhucaShape } from '$lib/types';
+	import { create_shape } from '$lib/shape.svelte';
+	import { AABB, QuadTree } from '$lib/qtree';
+	import type { Shape, RoughOptions, Tools, CursorStyle } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { RoughGenerator } from 'roughjs/bin/generator';
+	import { BoundingBox } from '$lib/selection-box.svelte';
 
 	type Props = {
-		mode: DesenhucaMode;
+		tool: Tools;
+		behavior: 'drag' | 'resize' | 'none';
+		cursor_style: CursorStyle;
 		drawing: boolean;
 		selecting: boolean;
-		dragging: boolean;
 		draw: () => void;
 		select: () => void;
 		drag: () => void;
 		defer: () => void;
+		resize: () => void;
 	};
 
-	let { mode, drawing, selecting, dragging, draw, select, drag, defer }: Props = $props();
+	let {
+		tool,
+		behavior,
+		cursor_style = $bindable(),
+		selecting,
+		drawing,
+		resize,
+		draw,
+		select,
+		drag,
+		defer
+	}: Props = $props();
 
 	let canvas: HTMLCanvasElement;
 	let context: CanvasRenderingContext2D;
@@ -28,22 +42,28 @@
 
 	const dpr = window.devicePixelRatio;
 
-	const shapes: DesenhucaShape[] = $state([]);
+	const shapes: Shape[] = $state([]);
+	let shape: Shape | null = $state(null);
 
 	let mouse = $state({ x: 0, y: 0 });
-	let offset = $state({ x: 0, y: 0 });
 
-	let target: DesenhucaShape | null = $state(null);
+	let options: RoughOptions = $state({
+		seed: 10,
+		roughness: 4,
+		strokeWidth: 4
+	});
 
-	let intersecting: boolean = $state(false);
+	const box = new BoundingBox({
+		stroke: 'rgba(137, 196, 244, 1)',
+		strokeWidth: 4,
+		roughness: 0
+	});
 
-	const flush = () => context.clearRect(0, 0, canvas.width, canvas.height);
+	let target: Shape | null = $state(null);
 
-	function flush_n_redraw() {
-		flush();
-		for (let i = 0; i < shapes.length; i++) {
-			shapes[i].draw(rough);
-		}
+	function refresh() {
+		context.clearRect(0, 0, canvas.width, canvas.height);
+		shapes.forEach((shape) => shape.draw(rough));
 	}
 
 	function onpointerdown(event: PointerEvent) {
@@ -52,21 +72,31 @@
 
 		mouse = { x, y };
 
-		switch (mode) {
-			case 'select':
-				flush_n_redraw();
-
-				if (intersecting && target) {
-					offset = { x: x - target.x, y: y - target.y };
+		switch (tool) {
+			case 'pointer':
+				if (box.contains(x, y)) {
+					box.update_offset(x, y);
 					drag();
-					flush_n_redraw();
-					target.draw(rough);
-					target.highlight(rough);
+				} else if (box.intersects(x, y)) {
+					resize();
+				} else {
+					box.clean();
+					refresh();
+					select();
 
-					return;
+					const found: Shape[] = [];
+
+					qtree.query_by_point(x, y, found);
+
+					const [target] = found;
+
+					if (target) {
+						box.add(target);
+						box.draw(rough);
+					}
+
+					cursor_style = 'default';
 				}
-
-				select();
 
 				break;
 			case 'rectangle':
@@ -74,13 +104,10 @@
 			case 'line':
 				draw();
 
-				const shape = create_shape(mode, x, y, 0, 0, {
-					seed: 10,
-					roughness: 4,
-					strokeWidth: 4
-				});
+				box.clean();
 
-				shapes.push(shape);
+				shape = create_shape(tool, x, y, 0, 0, options);
+
 				break;
 		}
 	}
@@ -89,52 +116,59 @@
 		const x = event.offsetX * devicePixelRatio;
 		const y = event.offsetY * devicePixelRatio;
 
-		const found: DesenhucaShape[] = [];
+		const found: Shape[] = [];
 
-		switch (mode) {
-			case 'select':
+		switch (tool) {
+			case 'pointer':
+				if (!box.is_empty()) {
+					if (box.contains(x, y)) {
+						cursor_style = 'move';
+					} else if (box.intersects_heights(x, y)) {
+						cursor_style = 'ew-resize';
+					} else if (box.intersects_base(x, y)) {
+						cursor_style = 'ns-resize';
+					} else if (box.intersects_main_diagonal(x, y)) {
+						cursor_style = 'nwse-resize';
+					} else if (box.intersects_secondary_diagonal(x, y)) {
+						cursor_style = 'nesw-resize';
+					} else {
+						cursor_style = 'default';
+					}
+				} else {
+					if (qtree.has(x, y)) {
+						cursor_style = 'move';
+					} else {
+						cursor_style = 'default';
+					}
+				}
+
 				if (selecting) {
+					cursor_style = 'default';
 					const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
-
 					qtree.query_by_range(range, found);
-
-					if (!found.length) return;
-
-					target = found[0];
-					target.highlight(rough);
-
-					return;
+					found.forEach((target) => box.add(target));
+				} else {
+					switch (behavior) {
+						case 'resize':
+							refresh();
+							box.update_offset(x, y);
+							box.resize(cursor_style, x, y);
+							box.draw(rough);
+							break;
+						case 'drag':
+							refresh();
+							box.move(x, y);
+							box.draw(rough);
+							break;
+					}
 				}
-
-				if (dragging && target) {
-					flush_n_redraw();
-
-					target.move(x, y, offset.x, offset.y);
-					target.draw(rough);
-					target.highlight(rough);
-
-					return;
-				}
-
-				qtree.query_by_point({ x, y }, found);
-				target = found[0];
-
-				if (target) {
-					intersecting = true;
-					return;
-				}
-
-				intersecting = false;
 				break;
+
 			case 'rectangle':
 			case 'ellipse':
 			case 'line':
-				if (!drawing) return;
-
-				const shape = shapes.at(-1);
-
 				if (shape) {
-					flush_n_redraw();
+					refresh();
 
 					shape.resize(x, y);
 					shape.draw(rough);
@@ -148,12 +182,15 @@
 	function onpointerup(event: PointerEvent) {
 		defer();
 
-		const shape = shapes.at(-1);
-
 		if (shape) {
 			qtree.insert(shape);
+			box.add(shape);
 		}
 
+		cursor_style = 'default';
+		box.draw(rough);
+
+		shape = null;
 		target = null;
 	}
 
@@ -175,6 +212,8 @@
 		boundary = new AABB(0, 0, canvas.width, canvas.height);
 
 		qtree = new QuadTree(boundary, 4);
+
+		qtree.visualize(context);
 	});
 </script>
 
@@ -182,9 +221,13 @@
 	bind:this={canvas}
 	width={window.innerWidth}
 	height={window.innerHeight}
-	class:cursor-crosshair={drawing &&
-		(mode === 'free-hand-draw' || mode === 'rectangle' || mode === 'ellipse' || mode === 'line')}
-	class:cursor-move={intersecting}
+	class:cursor-crosshair={cursor_style === 'crosshair'}
+	class:cursor-move={cursor_style === 'move'}
+	class:cursor-ew-resize={cursor_style === 'ew-resize'}
+	class:cursor-nwse-resize={cursor_style === 'nwse-resize'}
+	class:cursor-nesw-resize={cursor_style === 'nesw-resize'}
+	class:cursor-ns-resize={cursor_style === 'ns-resize'}
+	class:cursor-default={cursor_style === 'default'}
 	{onpointerdown}
 	{onpointermove}
 	{onpointerup}

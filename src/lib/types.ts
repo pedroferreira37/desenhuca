@@ -5,22 +5,54 @@ import type { ShapeKind } from './consts';
 export interface DesenhucaShape {
 	x: number;
 	y: number;
-	customize(options: DesenhucaShapeOptions): void;
-	move(x: number, y: number, offset_x: number, offset_y: number): void;
+	customize(options: RoughOptions): void;
+	move(x: number, y: number, offset: Point): void;
 	resize(x: number, y: number): void;
+	resize_proportionally(
+		side: CursorStyle,
+		box_x: number,
+		box_y: number,
+		prev_width: number,
+		prev_height: number
+	): void;
 	draw(rough: RoughCanvas): void;
-	intersects(point: Point): boolean;
-	contains(point: Point): boolean;
+	intersects(x: number, y: number): boolean;
+	contains(x: number, y: number): boolean;
 	dimensions(): Point[];
 	highlight(rough: RoughCanvas): void;
 }
+
+type Rectangle = DesenhucaShape & {
+	type: 'rectangle';
+	width: number;
+	height: number;
+};
+
+type Ellipse = DesenhucaShape & {
+	type: 'ellipse';
+	width: number;
+	height: number;
+};
+
+export type Shape = Rectangle | Ellipse;
 
 export interface Point {
 	x: number;
 	y: number;
 }
 
-export type DesenhucaShapeOptions = Partial<Options>;
+export type CursorStyle =
+	| 'default'
+	| 'crosshair'
+	| 'move'
+	| 'ew-resize'
+	| 'nwse-resize'
+	| 'nesw-resize'
+	| 'ns-resize';
 
-export type DesenhucaShapeType = (typeof ShapeKind)[keyof typeof ShapeKind];
-export type DesenhucaMode = 'select' | 'free-hand-draw' | 'erase' | 'pan' | DesenhucaShapeType;
+type Obligatory<T, K extends keyof T> = T & { [P in K]-?: T[K] };
+
+export type RoughOptions = Obligatory<Options, 'strokeWidth'>;
+
+export type ShapeType = (typeof ShapeKind)[keyof typeof ShapeKind];
+export type Tools = 'pointer' | 'free-hand-draw' | 'erase' | 'pan' | ShapeType;

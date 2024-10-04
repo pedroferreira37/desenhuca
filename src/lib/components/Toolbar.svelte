@@ -1,23 +1,23 @@
 <script lang="ts">
-	import type { DesenhucaMode } from '$lib/types';
+	import type { Tools } from '$lib/types';
 
 	type Props = {
-		selected: DesenhucaMode;
-		select: () => void;
+		selected: Tools;
+		pointer: () => void;
 		rectangle: () => void;
 		ellipse: () => void;
 		line: () => void;
 	};
 
-	let { selected, select, rectangle, ellipse, line }: Props = $props();
+	let { selected, pointer, rectangle, ellipse, line }: Props = $props();
 </script>
 
 <ul class="flex justify-center py-2 rounded-md bg-white text-white h-12 gap-4 px-2 border">
 	<li
 		class="rounded hover:bg-slate-200 p-2 transition-all flex items-center justify-center"
-		class:bg-slate-200={selected === 'select'}
+		class:bg-slate-200={selected === 'pointer'}
 	>
-		<button onclick={() => select()}>
+		<button onclick={() => pointer()}>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
