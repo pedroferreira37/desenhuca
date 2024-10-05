@@ -5,9 +5,9 @@
 	import type { CursorStyle, Tools } from '$lib/types';
 
 	let tool: Tools = $state('pointer');
-	let behavior: 'drag' | 'resize' | 'none' = $state('none');
+	let behavior: 'select' | 'drag' | 'resize' | 'default' = $state('default');
 
-	let cursor_style: CursorStyle = $state('default');
+	let cursor_type: CursorStyle = $state('default');
 
 	let drawing: boolean = $state(false);
 	let selecting: boolean = $state(false);
@@ -15,8 +15,8 @@
 	let prev_mouse = $state({ x: 0, y: 0 });
 	let mouse = $state({ x: 0, y: 0 });
 
-	function is_pointer_evs_blocked(behavior: 'drag' | 'resize' | 'none') {
-		return behavior === 'drag' || behavior === 'resize';
+	function is_pointer_evs_blocked(behavior: 'select' | 'drag' | 'resize' | 'default') {
+		return behavior === 'drag' || behavior === 'resize' || behavior === 'select';
 	}
 </script>
 
@@ -31,7 +31,7 @@
 				pointer={() => (tool = 'pointer')}
 				rectangle={() => {
 					tool = 'rectangle';
-					cursor_style = 'crosshair';
+					cursor_type = 'crosshair';
 				}}
 				ellipse={() => (tool = 'ellipse')}
 				line={() => (tool = 'line')}
@@ -42,7 +42,7 @@
 		</div> -->
 	</div>
 	<div class="w-full h-full absolute top-0 left-0">
-		{#if tool === 'pointer' && selecting}
+		{#if behavior === 'select'}
 			<Lasso
 				x={prev_mouse.x}
 				y={prev_mouse.y}
@@ -57,8 +57,10 @@
 			{behavior}
 			{selecting}
 			{drawing}
-			bind:cursor_style
-			select={() => (selecting = true)}
+			bind:cursor_type
+			select={() => {
+				behavior = 'select';
+			}}
 			draw={() => (drawing = true)}
 			drag={() => {
 				behavior = 'drag';
@@ -70,7 +72,7 @@
 			}}
 			defer={() => {
 				tool = 'pointer';
-				behavior = 'none';
+				behavior = 'default';
 				selecting = false;
 				drawing = false;
 			}}

@@ -6,11 +6,12 @@
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { RoughGenerator } from 'roughjs/bin/generator';
 	import { BoundingBox } from '$lib/selection-box.svelte';
+	import { INTERSECTION_SIDE } from '$lib/consts';
 
 	type Props = {
 		tool: Tools;
-		behavior: 'drag' | 'resize' | 'none';
-		cursor_style: CursorStyle;
+		behavior: 'select' | 'drag' | 'resize' | 'default';
+		cursor_type: CursorStyle;
 		drawing: boolean;
 		selecting: boolean;
 		draw: () => void;
@@ -23,7 +24,7 @@
 	let {
 		tool,
 		behavior,
-		cursor_style = $bindable(),
+		cursor_type = $bindable(),
 		selecting,
 		drawing,
 		resize,
@@ -61,6 +62,8 @@
 
 	let target: Shape | null = $state(null);
 
+	let intersection_side = $state('');
+
 	function refresh() {
 		context.clearRect(0, 0, canvas.width, canvas.height);
 		shapes.forEach((shape) => shape.draw(rough));
@@ -77,25 +80,42 @@
 				if (box.contains(x, y)) {
 					box.update_offset(x, y);
 					drag();
-				} else if (box.intersects(x, y)) {
-					resize();
+					return;
+				}
+
+				const [box_intersects, side] = box.intersects(x, y);
+
+				/*
+                Have to check side, because either I have skill issue of typescript
+                is a hell. I don't wanna pick, if you reach untill here, you chose
+                */
+
+				if (box_intersects && side) {
+					intersection_side = side;
+					cursor_type = INTERSECTION_SIDE[side];
 				} else {
-					box.clean();
-					refresh();
-					select();
+					cursor_type = qtree.has(x, y) ? 'move' : 'default';
+				}
 
-					const found: Shape[] = [];
+				resize();
+				return;
 
-					qtree.query_by_point(x, y, found);
+				box.clean();
+				refresh();
+				select();
 
-					const [target] = found;
+				const found: Shape[] = [];
 
-					if (target) {
-						box.add(target);
-						box.draw(rough);
-					}
+				qtree.query_by_point(x, y, found);
 
-					cursor_style = 'default';
+				const [target] = found;
+
+				if (target) {
+					box.add(target);
+					box.draw(rough);
+				} else {
+					cursor_type = 'default';
+					behavior = 'select';
 				}
 
 				break;
@@ -112,6 +132,18 @@
 		}
 	}
 
+	function get_cursor_type(box: BoundingBox, qtree: QuadTree, x: number, y: number): CursorStyle {
+		if (box.is_empty()) return qtree.has(x, y) ? 'move' : 'default';
+
+		if (box.contains(x, y)) return 'move';
+		if (box.intersects_heights(x, y)) return 'ew-resize';
+		if (box.intersects_base(x, y)) return 'ns-resize';
+		if (box.intersects_main_diagonal(x, y)) return 'nwse-resize';
+		if (box.intersects_main_diagonal(x, y)) return 'nesw-resize';
+
+		return 'default';
+	}
+
 	function onpointermove(event: PointerEvent) {
 		const x = event.offsetX * devicePixelRatio;
 		const y = event.offsetY * devicePixelRatio;
@@ -120,53 +152,38 @@
 
 		switch (tool) {
 			case 'pointer':
-				if (!box.is_empty()) {
-					if (box.contains(x, y)) {
-						cursor_style = 'move';
-					} else if (box.intersects_heights(x, y)) {
-						cursor_style = 'ew-resize';
-					} else if (box.intersects_base(x, y)) {
-						cursor_style = 'ns-resize';
-					} else if (box.intersects_main_diagonal(x, y)) {
-						cursor_style = 'nwse-resize';
-					} else if (box.intersects_secondary_diagonal(x, y)) {
-						cursor_style = 'nesw-resize';
-					} else {
-						cursor_style = 'default';
-					}
-				} else {
-					if (qtree.has(x, y)) {
-						cursor_style = 'move';
-					} else {
-						cursor_style = 'default';
-					}
-				}
+				switch (behavior) {
+					case 'select':
+						const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
+						qtree.query_by_range(range, found);
+						found.forEach((target) => box.add(target));
+						break;
 
-				if (selecting) {
-					cursor_style = 'default';
-					const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
-					qtree.query_by_range(range, found);
-					found.forEach((target) => box.add(target));
-				} else {
-					switch (behavior) {
-						case 'resize':
-							refresh();
-							box.update_offset(x, y);
-							box.resize(cursor_style, x, y);
-							box.draw(rough);
-							break;
-						case 'drag':
-							refresh();
-							box.move(x, y);
-							box.draw(rough);
-							break;
-					}
+					case 'resize':
+						refresh();
+						box.resize(intersection_side, x, y);
+						box.draw(rough);
+						break;
+
+					case 'drag':
+						refresh();
+						box.move(x, y);
+						box.draw(rough);
+						break;
+
+					default: // Corrected semicolon to colon here
+						const [intersects, side] = box.intersects(x, y);
+
+						cursor_type = intersects ? INTERSECTION_SIDE[side] : 'default';
+
+						break;
 				}
-				break;
 
 			case 'rectangle':
 			case 'ellipse':
 			case 'line':
+				if (!shape) break;
+
 				if (shape) {
 					refresh();
 
@@ -187,7 +204,7 @@
 			box.add(shape);
 		}
 
-		cursor_style = 'default';
+		cursor_type = 'default';
 		box.draw(rough);
 
 		shape = null;
@@ -221,13 +238,13 @@
 	bind:this={canvas}
 	width={window.innerWidth}
 	height={window.innerHeight}
-	class:cursor-crosshair={cursor_style === 'crosshair'}
-	class:cursor-move={cursor_style === 'move'}
-	class:cursor-ew-resize={cursor_style === 'ew-resize'}
-	class:cursor-nwse-resize={cursor_style === 'nwse-resize'}
-	class:cursor-nesw-resize={cursor_style === 'nesw-resize'}
-	class:cursor-ns-resize={cursor_style === 'ns-resize'}
-	class:cursor-default={cursor_style === 'default'}
+	class:cursor-crosshair={cursor_type === 'crosshair'}
+	class:cursor-move={cursor_type === 'move'}
+	class:cursor-ew-resize={cursor_type === 'ew-resize'}
+	class:cursor-nwse-resize={cursor_type === 'nwse-resize'}
+	class:cursor-nesw-resize={cursor_type === 'nesw-resize'}
+	class:cursor-ns-resize={cursor_type === 'ns-resize'}
+	class:cursor-default={cursor_type === 'default'}
 	{onpointerdown}
 	{onpointermove}
 	{onpointerup}
