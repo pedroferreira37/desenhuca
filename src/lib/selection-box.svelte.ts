@@ -1,5 +1,13 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { Shape, Point, RoughOptions, CursorStyle } from './types';
+import type {
+	Shape,
+	Point,
+	RoughOptions,
+	CursorStyle,
+	CursorDirection,
+	IntersectionDirection
+} from './types';
+import { BOTTOM, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, TOP_LEFT, TOP_RIGHT } from './consts';
 
 const EDGE_SIZE = 14;
 const BOX_MARGIN = 5;
@@ -63,13 +71,39 @@ export class BoundingBox {
 		);
 	}
 
-	intersects(x: number, y: number): boolean {
-		return !(
-			x < this.x - BOX_MARGIN * 2 ||
-			x > this.x + this.width + BOX_MARGIN * 2 ||
-			y < this.y - BOX_MARGIN * 2 ||
-			y > this.y + this.height + BOX_MARGIN * 2
+	intersects(x: number, y: number): [boolean, IntersectionDirection | null] {
+		// return !(
+		// 	x < this.x - BOX_MARGIN * 2 ||
+		// 	x > this.x + this.width + BOX_MARGIN * 2 ||
+		// 	y < this.y - BOX_MARGIN * 2 ||
+		// 	y > this.y + this.height + BOX_MARGIN * 2
+		// );
+
+		const is_within_y_bounds = !(
+			y < this.y - BOX_MARGIN + EDGE_SIZE || y > this.y + this.height + BOX_MARGIN * 2 - EDGE_SIZE
 		);
+
+		const is_within_x_bounds = !(
+			x < this.x - BOX_MARGIN + EDGE_SIZE || x > this.x + this.width + BOX_MARGIN * 2 - EDGE_SIZE
+		);
+
+		if (!(x < this.x - BOX_MARGIN * 2) && is_within_y_bounds) return [true, LEFT];
+
+		if (!(x > this.x + this.width - BOX_MARGIN * 2) && is_within_y_bounds) return [true, RIGHT];
+
+		if (!(y < this.y - BOX_MARGIN * 2) && is_within_x_bounds) return [true, TOP];
+
+		if (!(y > this.y + this.height + BOX_MARGIN) && is_within_x_bounds) return [true, BOTTOM];
+
+		if (this.norwest.intersects(x, y)) return [true, TOP_LEFT];
+
+		if (this.northeast.intersects(x, y)) return [true, TOP_RIGHT];
+
+		if (this.southwest.intersects(x, y)) return [true, BOTTOM_LEFT];
+
+		if (this.southwest.intersects(x, y)) return [true, BOTTOM_RIGHT];
+
+		return [false, null];
 	}
 
 	intersects_heights(x: number, y: number): boolean {
@@ -105,7 +139,7 @@ export class BoundingBox {
 		this.compute();
 	}
 
-	resize(side: CursorStyle, x: number, y: number) {
+	resize(side: string, x: number, y: number) {
 		const prev_width = this.width;
 		const prev_height = this.height;
 
@@ -115,27 +149,10 @@ export class BoundingBox {
 		this.targets.forEach((target) => {
 			target.resize_proportionally(
 				side,
-				{
-					x: this.x,
-					y: this.y,
-					width: this.width,
-					height: this.height
-				},
+				[this.x, this.y, this.width, this.height],
 				prev_width,
 				prev_height
 			);
-
-			console.log(target.width);
-
-			const rel_left = (target.x - this.x) / prev_width;
-			const rel_right = (target.x + target.width - this.x) / prev_width;
-			const rel_top = (target.y - this.y) / prev_height;
-			const rel_bottom = (target.y + target.height - this.y) / prev_height;
-
-			target.x = this.x + rel_left * this.width;
-			target.width = rel_right * this.width - rel_left * this.width;
-			target.y = this.y + rel_top * this.height;
-			target.height = rel_bottom * this.height - rel_top * this.height;
 		});
 
 		this.compute();

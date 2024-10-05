@@ -32,26 +32,44 @@ export class Rectangle implements DesenhucaShape {
 	}
 
 	resize_proportionally(
-		side: CursorStyle,
-		box_bounds: { x: number; y: number; width: number; height: number },
+		side: string,
+		box_coordinates: number[],
 		prev_width: number,
 		prev_height: number
 	): void {
-		const rel_left = (this.x - box_bounds.x) / prev_width;
-		const rel_right = (this.x + this.width - box_bounds.x) / prev_width;
-		const rel_top = (this.y - box_bounds.y) / prev_height;
-		const rel_bottom = (this.y + this.height - box_bounds.y) / prev_height;
+		const [x, y, width, height] = box_coordinates;
 
+		const rel_left = (this.x - x) / prev_width;
+		const rel_right = (this.x + this.width - x) / prev_width;
+		const rel_top = (this.y - y) / prev_height;
+		const rel_bottom = (this.y + this.height - y) / prev_height;
+		/* 
+ Note:
+                 * To maintain the correct resize for all directions, we 
+                 * have to maintain a fix point, and grow another point. 
+                 * Either the width or the x
+                 *
+                 * */
+
+		/* 
+ Note:
+                 * I'll commit this since is wip, and my project and I need to remember
+                 * I'm high and my girl wanna go out saying that everytime I stuck
+                 * in this thing called programming
+                 * brb
+                 * This is wrong btw
+                 *
+                 * */
+
+		const base_x = this.x + this.width;
 		switch (side) {
-			case 'ew-resize':
-				this.x = box_bounds.x + rel_left * box_bounds.width;
-				this.width = rel_right * box_bounds.width - rel_left * box_bounds.width;
+			case 'left':
+				this.x = x + rel_left * width;
+				this.width = rel_right * width - rel_left * width;
 				break;
-			case 'nwse-resize':
-				this.x = box_bounds.x + rel_left * box_bounds.width;
-				this.width = rel_right * box_bounds.width - rel_left * box_bounds.width;
-				this.y = box_bounds.y + rel_top * box_bounds.height;
-				this.height = rel_bottom * box_bounds.height - rel_top * box_bounds.height;
+			case 'right':
+				this.x = x + rel_left * width;
+				this.width = base_x * width;
 				break;
 			case 'ns-resize':
 				// do nothing for a moment
