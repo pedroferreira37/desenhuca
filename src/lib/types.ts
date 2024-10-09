@@ -1,6 +1,13 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 import type { Options } from 'roughjs/bin/core';
-import type { INTERSECTION_SIDE, ShapeKind } from './consts';
+import type { ShapeKind } from './consts';
+
+export type Box = {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+};
 
 export interface DesenhucaShape {
 	x: number;
@@ -9,8 +16,8 @@ export interface DesenhucaShape {
 	move(x: number, y: number, offset: Point): void;
 	resize(x: number, y: number): void;
 	resize_proportionally(
-		side: CursorStyle,
-		box_coordinates: number[],
+		side: HoverDirection,
+		box_coordinates: Box,
 		prev_width: number,
 		prev_height: number
 	): void;
@@ -40,7 +47,7 @@ export interface Point {
 	y: number;
 }
 
-export type CursorStyle =
+export type CursorGlyph =
 	| 'default'
 	| 'crosshair'
 	| 'move'
@@ -54,5 +61,15 @@ type Obligatory<T, K extends keyof T> = T & { [P in K]-?: T[K] };
 export type RoughOptions = Obligatory<Options, 'strokeWidth'>;
 
 export type ShapeType = (typeof ShapeKind)[keyof typeof ShapeKind];
-export type IntersectionDirection = keyof typeof INTERSECTION_SIDE;
+export type HoverDirection =
+	| 'left'
+	| 'right'
+	| 'top'
+	| 'bottom'
+	| 'south_west'
+	| 'south_east'
+	| 'nor_west'
+	| 'nor_east'
+	| 'none';
+
 export type Tools = 'pointer' | 'free-hand-draw' | 'erase' | 'pan' | ShapeType;

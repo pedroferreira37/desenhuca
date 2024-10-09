@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { create_shape } from '$lib/shape.svelte';
 	import { AABB, QuadTree } from '$lib/qtree';
-	import type { Shape, RoughOptions, Tools, CursorStyle } from '$lib/types';
+	import type {
+		Shape,
+		RoughOptions,
+		Tools,
+		CursorGlyph,
+		EdgeSide,
+		HoverDirection
+	} from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { RoughGenerator } from 'roughjs/bin/generator';
 	import { BoundingBox } from '$lib/selection-box.svelte';
-	import { INTERSECTION_SIDE } from '$lib/consts';
+	import { EDGES_GLYPH } from '$lib/consts';
 
 	type Props = {
 		tool: Tools;
 		behavior: 'select' | 'drag' | 'resize' | 'default';
-		cursor_type: CursorStyle;
+		cursor_glyph: CursorGlyph;
 		drawing: boolean;
 		selecting: boolean;
 		draw: () => void;
@@ -24,7 +31,7 @@
 	let {
 		tool,
 		behavior,
-		cursor_type = $bindable(),
+		cursor_glyph = $bindable(),
 		selecting,
 		drawing,
 		resize,
@@ -38,7 +45,6 @@
 	let context: CanvasRenderingContext2D;
 	let rough: RoughCanvas;
 	let gen: RoughGenerator;
-	let boundary: AABB;
 	let qtree: QuadTree;
 
 	const dpr = window.devicePixelRatio;
@@ -62,7 +68,7 @@
 
 	let target: Shape | null = $state(null);
 
-	let intersection_side = $state('');
+	let direction: HoverDirection = $state('none');
 
 	function refresh() {
 		context.clearRect(0, 0, canvas.width, canvas.height);
@@ -80,42 +86,29 @@
 				if (box.contains(x, y)) {
 					box.update_offset(x, y);
 					drag();
-					return;
-				}
-
-				const [box_intersects, side] = box.intersects(x, y);
-
-				/*
-                Have to check side, because either I have skill issue of typescript
-                is a hell. I don't wanna pick, if you reach untill here, you chose
-                */
-
-				if (box_intersects && side) {
-					intersection_side = side;
-					cursor_type = INTERSECTION_SIDE[side];
+				} else if (box.intersects(x, y)) {
+					direction = box.detect_hover_direction(x, y);
+					resize();
 				} else {
-					cursor_type = qtree.has(x, y) ? 'move' : 'default';
-				}
+					cursor_glyph = qtree.has(x, y) ? 'move' : 'default';
 
-				resize();
-				return;
+					refresh();
+					select();
+					box.clean();
 
-				box.clean();
-				refresh();
-				select();
+					const found: Shape[] = [];
 
-				const found: Shape[] = [];
+					qtree.query_by_point(x, y, found);
 
-				qtree.query_by_point(x, y, found);
+					const [target] = found;
 
-				const [target] = found;
-
-				if (target) {
-					box.add(target);
-					box.draw(rough);
-				} else {
-					cursor_type = 'default';
-					behavior = 'select';
+					if (target) {
+						box.add(target);
+						box.draw(rough);
+					} else {
+						cursor_glyph = 'default';
+						behavior = 'select';
+					}
 				}
 
 				break;
@@ -130,18 +123,6 @@
 
 				break;
 		}
-	}
-
-	function get_cursor_type(box: BoundingBox, qtree: QuadTree, x: number, y: number): CursorStyle {
-		if (box.is_empty()) return qtree.has(x, y) ? 'move' : 'default';
-
-		if (box.contains(x, y)) return 'move';
-		if (box.intersects_heights(x, y)) return 'ew-resize';
-		if (box.intersects_base(x, y)) return 'ns-resize';
-		if (box.intersects_main_diagonal(x, y)) return 'nwse-resize';
-		if (box.intersects_main_diagonal(x, y)) return 'nesw-resize';
-
-		return 'default';
 	}
 
 	function onpointermove(event: PointerEvent) {
@@ -161,7 +142,7 @@
 
 					case 'resize':
 						refresh();
-						box.resize(intersection_side, x, y);
+						box.resize(direction, x, y);
 						box.draw(rough);
 						break;
 
@@ -171,11 +152,13 @@
 						box.draw(rough);
 						break;
 
-					default: // Corrected semicolon to colon here
-						const [intersects, side] = box.intersects(x, y);
-
-						cursor_type = intersects ? INTERSECTION_SIDE[side] : 'default';
-
+					default:
+						if (box.contains(x, y)) {
+							cursor_glyph = 'move';
+						} else {
+							const direction = box.detect_hover_direction(x, y);
+							cursor_glyph = EDGES_GLYPH[direction];
+						}
 						break;
 				}
 
@@ -204,7 +187,7 @@
 			box.add(shape);
 		}
 
-		cursor_type = 'default';
+		cursor_glyph = 'default';
 		box.draw(rough);
 
 		shape = null;
@@ -226,9 +209,7 @@
 		canvas.style.width = `${rect.width}px`;
 		canvas.style.height = `${rect.height}px`;
 
-		boundary = new AABB(0, 0, canvas.width, canvas.height);
-
-		qtree = new QuadTree(boundary, 4);
+		qtree = new QuadTree(new AABB(0, 0, canvas.width, canvas.height), 4);
 
 		qtree.visualize(context);
 	});
@@ -238,13 +219,13 @@
 	bind:this={canvas}
 	width={window.innerWidth}
 	height={window.innerHeight}
-	class:cursor-crosshair={cursor_type === 'crosshair'}
-	class:cursor-move={cursor_type === 'move'}
-	class:cursor-ew-resize={cursor_type === 'ew-resize'}
-	class:cursor-nwse-resize={cursor_type === 'nwse-resize'}
-	class:cursor-nesw-resize={cursor_type === 'nesw-resize'}
-	class:cursor-ns-resize={cursor_type === 'ns-resize'}
-	class:cursor-default={cursor_type === 'default'}
+	class:cursor-crosshair={cursor_glyph === 'crosshair'}
+	class:cursor-move={cursor_glyph === 'move'}
+	class:cursor-ew-resize={cursor_glyph === 'ew-resize'}
+	class:cursor-nwse-resize={cursor_glyph === 'nwse-resize'}
+	class:cursor-nesw-resize={cursor_glyph === 'nesw-resize'}
+	class:cursor-ns-resize={cursor_glyph === 'ns-resize'}
+	class:cursor-default={cursor_glyph === 'default'}
 	{onpointerdown}
 	{onpointermove}
 	{onpointerup}

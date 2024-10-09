@@ -1,8 +1,15 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { CursorStyle, DesenhucaShape, RoughOptions, ShapeType } from './types';
+import type {
+	Box,
+	CursorGlyph,
+	DesenhucaShape,
+	EdgeSide,
+	HoverDirection,
+	RoughOptions,
+	ShapeType
+} from './types';
 import type { Point } from './types';
 import { ShapeKind } from './consts';
-import type { RoughGenerator } from 'roughjs/bin/generator';
 
 export class Rectangle implements DesenhucaShape {
 	type = 'rectangle';
@@ -32,47 +39,35 @@ export class Rectangle implements DesenhucaShape {
 	}
 
 	resize_proportionally(
-		side: string,
-		box_coordinates: number[],
+		side: HoverDirection,
+		box_coordinates: Box,
 		prev_width: number,
 		prev_height: number
 	): void {
-		const [x, y, width, height] = box_coordinates;
+		const { x, y, width, height } = box_coordinates;
 
 		const rel_left = (this.x - x) / prev_width;
 		const rel_right = (this.x + this.width - x) / prev_width;
 		const rel_top = (this.y - y) / prev_height;
 		const rel_bottom = (this.y + this.height - y) / prev_height;
-		/* 
- Note:
-                 * To maintain the correct resize for all directions, we 
-                 * have to maintain a fix point, and grow another point. 
-                 * Either the width or the x
-                 *
-                 * */
 
-		/* 
- Note:
-                 * I'll commit this since is wip, and my project and I need to remember
-                 * I'm high and my girl wanna go out saying that everytime I stuck
-                 * in this thing called programming
-                 * brb
-                 * This is wrong btw
-                 *
-                 * */
-
-		const base_x = this.x + this.width;
 		switch (side) {
-			case 'left':
+			case 'south_east':
+				this.x = x + rel_left * width;
+				this.width = rel_right * width - rel_left * width;
+				this.y = y + rel_top * height;
+				this.height = rel_bottom * height - rel_top * height;
+			case 'right':
 				this.x = x + rel_left * width;
 				this.width = rel_right * width - rel_left * width;
 				break;
-			case 'right':
-				this.x = x + rel_left * width;
-				this.width = base_x * width;
+			case 'left':
+				const fixed_width = this.x + this.width;
+				this.width = fixed_width - x;
+				this.x = x;
 				break;
-			case 'ns-resize':
-				// do nothing for a moment
+			case 'none':
+				console.log('is noning right here');
 				break;
 		}
 		// this.width = x - this.x;

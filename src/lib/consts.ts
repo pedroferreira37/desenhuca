@@ -9,22 +9,14 @@ export const NS_RESIZE = 'ns-resize';
 export const NESW_RESIZE = 'nesw-resize';
 export const NWSE_RESIZE = 'nwse-resize';
 
-export const LEFT = 'left' as const;
-export const RIGHT = 'right' as const;
-export const TOP = 'top' as const;
-export const BOTTOM = 'bottom' as const;
-export const TOP_LEFT = 'top_left' as const;
-export const TOP_RIGHT = 'top_right' as const;
-export const BOTTOM_LEFT = 'bottom_left' as const;
-export const BOTTOM_RIGHT = 'bottom_right' as const;
-
-export const INTERSECTION_SIDE = {
-	[LEFT]: EW_RESIZE,
-	[RIGHT]: EW_RESIZE,
-	[TOP]: NS_RESIZE,
-	[BOTTOM]: NS_RESIZE,
-	[TOP_LEFT]: NWSE_RESIZE,
-	[BOTTOM_RIGHT]: NWSE_RESIZE,
-	[TOP_RIGHT]: NESW_RESIZE,
-	[BOTTOM_LEFT]: NWSE_RESIZE
+export const EDGES_GLYPH = {
+	left: EW_RESIZE,
+	right: EW_RESIZE,
+	top: NS_RESIZE,
+	bottom: NS_RESIZE,
+	nor_west: NWSE_RESIZE,
+	south_west: NESW_RESIZE,
+	nor_east: NESW_RESIZE,
+	south_east: NWSE_RESIZE,
+	none: 'default'
 } as const;
