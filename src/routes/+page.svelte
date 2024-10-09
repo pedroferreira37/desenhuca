@@ -2,12 +2,12 @@
 	import Canvas from '$lib/components/Canvas.svelte';
 	import Lasso from '$lib/components/Lasso.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
-	import type { CursorStyle, Tools } from '$lib/types';
+	import type { CursorGlyph, Tools } from '$lib/types';
 
 	let tool: Tools = $state('pointer');
 	let behavior: 'select' | 'drag' | 'resize' | 'default' = $state('default');
 
-	let cursor_type: CursorStyle = $state('default');
+	let cursor_glyph: CursorGlyph = $state('default');
 
 	let drawing: boolean = $state(false);
 	let selecting: boolean = $state(false);
@@ -31,7 +31,7 @@
 				pointer={() => (tool = 'pointer')}
 				rectangle={() => {
 					tool = 'rectangle';
-					cursor_type = 'crosshair';
+					cursor_glyph = 'crosshair';
 				}}
 				ellipse={() => (tool = 'ellipse')}
 				line={() => (tool = 'line')}
@@ -57,7 +57,7 @@
 			{behavior}
 			{selecting}
 			{drawing}
-			bind:cursor_type
+			bind:cursor_glyph
 			select={() => {
 				behavior = 'select';
 			}}

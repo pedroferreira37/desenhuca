@@ -1,15 +1,7 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type {
-	Shape,
-	Point,
-	RoughOptions,
-	CursorStyle,
-	CursorDirection,
-	IntersectionDirection
-} from './types';
-import { BOTTOM, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, TOP_LEFT, TOP_RIGHT } from './consts';
+import type { Shape, Point, RoughOptions, HoverDirection } from './types';
 
-const EDGE_SIZE = 14;
+const VERTICE_SIZE = 14;
 const BOX_MARGIN = 5;
 
 const EDGE_OPTIONS = {
@@ -30,10 +22,10 @@ export class BoundingBox {
 
 	offset: Map<Shape, Point> = $state(new Map());
 
-	norwest: Edge = $state(new Edge(0, 0, EDGE_SIZE, EDGE_SIZE, EDGE_OPTIONS));
-	northeast: Edge = $state(new Edge(0, 0, EDGE_SIZE, EDGE_SIZE, EDGE_OPTIONS));
-	southwest: Edge = $state(new Edge(0, 0, EDGE_SIZE, EDGE_SIZE, EDGE_OPTIONS));
-	southeast: Edge = $state(new Edge(0, 0, EDGE_SIZE, EDGE_SIZE, EDGE_OPTIONS));
+	norwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	northeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	southwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	southeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
 
 	options: RoughOptions;
 
@@ -71,63 +63,42 @@ export class BoundingBox {
 		);
 	}
 
-	intersects(x: number, y: number): [boolean, IntersectionDirection | null] {
-		// return !(
-		// 	x < this.x - BOX_MARGIN * 2 ||
-		// 	x > this.x + this.width + BOX_MARGIN * 2 ||
-		// 	y < this.y - BOX_MARGIN * 2 ||
-		// 	y > this.y + this.height + BOX_MARGIN * 2
-		// );
+	detect_hover_direction(x: number, y: number): HoverDirection {
+		if (this.northeast.intersects(x, y)) return 'nor_east';
+		if (this.southwest.intersects(x, y)) return 'south_west';
+		if (this.southeast.intersects(x, y)) return 'south_east';
+		if (this.norwest.intersects(x, y)) return 'nor_west';
 
-		const is_within_y_bounds = !(
-			y < this.y - BOX_MARGIN + EDGE_SIZE || y > this.y + this.height + BOX_MARGIN * 2 - EDGE_SIZE
-		);
+		if (
+			x < this.x - BOX_MARGIN * 2 ||
+			x > this.x + this.width + BOX_MARGIN * 2 ||
+			y < this.y - BOX_MARGIN * 2 ||
+			y > this.y + this.height + BOX_MARGIN * 2
+		)
+			return 'none';
 
-		const is_within_x_bounds = !(
-			x < this.x - BOX_MARGIN + EDGE_SIZE || x > this.x + this.width + BOX_MARGIN * 2 - EDGE_SIZE
-		);
+		const left_dist = Math.abs(x - this.x);
+		const right_dist = Math.abs(x - (this.x + this.width));
+		const top_dist = Math.abs(y - this.y);
+		const bottom_dist = Math.abs(y - (this.y + this.height));
 
-		if (!(x < this.x - BOX_MARGIN * 2) && is_within_y_bounds) return [true, LEFT];
+		const min = Math.min(left_dist, right_dist, top_dist, bottom_dist);
 
-		if (!(x > this.x + this.width - BOX_MARGIN * 2) && is_within_y_bounds) return [true, RIGHT];
+		if (min === left_dist) return 'left';
+		if (min === right_dist) return 'right';
+		if (min === top_dist) return 'top';
+		if (min === bottom_dist) return 'bottom';
 
-		if (!(y < this.y - BOX_MARGIN * 2) && is_within_x_bounds) return [true, TOP];
-
-		if (!(y > this.y + this.height + BOX_MARGIN) && is_within_x_bounds) return [true, BOTTOM];
-
-		if (this.norwest.intersects(x, y)) return [true, TOP_LEFT];
-
-		if (this.northeast.intersects(x, y)) return [true, TOP_RIGHT];
-
-		if (this.southwest.intersects(x, y)) return [true, BOTTOM_LEFT];
-
-		if (this.southwest.intersects(x, y)) return [true, BOTTOM_RIGHT];
-
-		return [false, null];
+		return 'none';
 	}
 
-	intersects_heights(x: number, y: number): boolean {
-		return (
-			!(x < this.x - BOX_MARGIN * 2 || x > this.x + this.width + BOX_MARGIN) &&
-			!(
-				y < this.y - BOX_MARGIN + EDGE_SIZE || y > this.y + this.height + BOX_MARGIN * 2 - EDGE_SIZE
-			)
+	intersects(x: number, y: number): boolean {
+		return !(
+			x < this.x - BOX_MARGIN * 2 ||
+			x > this.x + this.width + BOX_MARGIN * 2 ||
+			y < this.y - BOX_MARGIN * 2 ||
+			y > this.y + this.height + BOX_MARGIN * 2
 		);
-	}
-
-	intersects_base(x: number, y: number): boolean {
-		return (
-			!(y < this.y - BOX_MARGIN * 2 || y > this.y + this.height + BOX_MARGIN) &&
-			!(x < this.x - BOX_MARGIN + EDGE_SIZE || x > this.x + this.width + BOX_MARGIN * 2 - EDGE_SIZE)
-		);
-	}
-
-	intersects_main_diagonal(x: number, y: number): boolean {
-		return this.norwest.intersects(x, y) || this.southeast.intersects(x, y);
-	}
-
-	intersects_secondary_diagonal(x: number, y: number): boolean {
-		return this.northeast.intersects(x, y) || this.southwest.intersects(x, y);
 	}
 
 	move(x: number, y: number) {
@@ -139,7 +110,7 @@ export class BoundingBox {
 		this.compute();
 	}
 
-	resize(side: string, x: number, y: number) {
+	resize(direction: HoverDirection, x: number, y: number) {
 		const prev_width = this.width;
 		const prev_height = this.height;
 
@@ -148,8 +119,13 @@ export class BoundingBox {
 
 		this.targets.forEach((target) => {
 			target.resize_proportionally(
-				side,
-				[this.x, this.y, this.width, this.height],
+				direction,
+				{
+					x: this.x,
+					y: this.y,
+					height: this.height,
+					width: this.width
+				},
 				prev_width,
 				prev_height
 			);
@@ -175,10 +151,13 @@ export class BoundingBox {
 		this.width = width + BOX_MARGIN * 2;
 		this.height = height + BOX_MARGIN * 2;
 
-		this.norwest.move(this.x - EDGE_SIZE / 2, this.y - EDGE_SIZE / 2);
-		this.northeast.move(this.x + this.width - EDGE_SIZE / 2, this.y - EDGE_SIZE / 2);
-		this.southwest.move(this.x - EDGE_SIZE / 2, this.y + this.height - EDGE_SIZE / 2);
-		this.southeast.move(this.x + this.width - EDGE_SIZE / 2, this.y + this.height - EDGE_SIZE / 2);
+		this.norwest.move(this.x - VERTICE_SIZE / 2, this.y - VERTICE_SIZE / 2);
+		this.northeast.move(this.x + this.width - VERTICE_SIZE / 2, this.y - VERTICE_SIZE / 2);
+		this.southwest.move(this.x - VERTICE_SIZE / 2, this.y + this.height - VERTICE_SIZE / 2);
+		this.southeast.move(
+			this.x + this.width - VERTICE_SIZE / 2,
+			this.y + this.height - VERTICE_SIZE / 2
+		);
 
 		if (this.targets.size > 1) this.options.strokeLineDash = [5, 5];
 		else this.options.strokeLineDash = [0, 0];
@@ -200,7 +179,7 @@ export class BoundingBox {
 	}
 }
 
-class Edge {
+class Vertice {
 	constructor(
 		public x: number,
 		public y: number,
