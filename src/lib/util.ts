@@ -1,19 +1,20 @@
-export function get_min(arr: number[]): number {
-	let max = arr[0];
+import type { Tools } from './types';
 
-	for (const value of arr) {
-		max = Math.max(max, value);
+export function switchToolByKey(key: string): Tools {
+	switch (key) {
+		case '1':
+			return 'pointer';
+		case '2':
+			return 'free-hand-draw';
+		case '3':
+			return 'rectangle';
+		case '4':
+			return 'ellipse';
+		case '4':
+			return 'line';
+		case '6':
+			return 'erase';
+		default:
+			return 'pointer';
 	}
-
-	return max;
-}
-
-export function get_max(arr: number[]): number {
-	let min = arr[0];
-
-	for (const value of arr) {
-		min = Math.min(min, value);
-	}
-
-	return min;
 }

@@ -2,33 +2,37 @@
 	import Canvas from '$lib/components/Canvas.svelte';
 	import Lasso from '$lib/components/Lasso.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
-	import type { CursorGlyph, Tools } from '$lib/types';
+	import type { Cursor, Tools } from '$lib/types';
+	import { switchToolByKey } from '$lib/util';
 
 	let tool: Tools = $state('pointer');
 	let behavior: 'select' | 'drag' | 'resize' | 'default' = $state('default');
 
-	let cursor_glyph: CursorGlyph = $state('default');
+	let cursor_glyph: Cursor = $state('default');
 
 	let drawing: boolean = $state(false);
 	let selecting: boolean = $state(false);
 
-	let prev_mouse = $state({ x: 0, y: 0 });
+	let prevMouse = $state({ x: 0, y: 0 });
 	let mouse = $state({ x: 0, y: 0 });
 
-	function is_pointer_evs_blocked(behavior: 'select' | 'drag' | 'resize' | 'default') {
+	function isPointerEvsBlocked(behavior: 'select' | 'drag' | 'resize' | 'default') {
 		return behavior === 'drag' || behavior === 'resize' || behavior === 'select';
 	}
 </script>
 
 <main class="absolute top-0 left-0 w-full h-full">
 	<div
-		class:pointer-events-none={drawing || selecting || is_pointer_evs_blocked(behavior)}
+		class:pointer-events-none={drawing || selecting || isPointerEvsBlocked(behavior)}
 		class="relative flex justify-center w-full h-full overflow-hidden"
 	>
 		<div class="absolute z-10 shadow-sm max-w-full bottom-4">
 			<Toolbar
 				selected={tool}
-				pointer={() => (tool = 'pointer')}
+				pointer={() => {
+					tool = 'pointer';
+					cursor_glyph = 'default';
+				}}
 				rectangle={() => {
 					tool = 'rectangle';
 					cursor_glyph = 'crosshair';
@@ -44,10 +48,10 @@
 	<div class="w-full h-full absolute top-0 left-0">
 		{#if behavior === 'select'}
 			<Lasso
-				x={prev_mouse.x}
-				y={prev_mouse.y}
-				width={mouse.x - prev_mouse.x}
-				height={mouse.y - prev_mouse.y}
+				x={prevMouse.x}
+				y={prevMouse.y}
+				width={mouse.x - prevMouse.x}
+				height={mouse.y - prevMouse.y}
 				completed={() => (selecting = false)}
 			/>
 		{/if}
@@ -85,8 +89,8 @@
 		const x = event.offsetX;
 		const y = event.offsetY;
 
-		prev_mouse.x = x;
-		prev_mouse.y = y;
+		prevMouse.x = x;
+		prevMouse.y = y;
 	}}
 	onpointermove={(event) => {
 		const x = event.offsetX;
@@ -97,5 +101,13 @@
 	}}
 	onmouseup={() => {
 		selecting = false;
+	}}
+	onkeydown={(event) => {
+		const key = event.key;
+		tool = switchToolByKey(key);
+
+		if (tool === 'rectangle') {
+			cursor_glyph = 'crosshair';
+		}
 	}}
 />

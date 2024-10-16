@@ -44,7 +44,12 @@ export class QuadTree {
 	}
 
 	insert(shape: Shape): boolean {
-		const points = shape.dimensions();
+		const [top, right, bottom, left] = shape.coordinates;
+
+		const points = [
+			{ x: left, y: top },
+			{ x: right, y: bottom }
+		];
 
 		if (!points.every((p) => this.boundary.contains(p.x, p.y))) {
 			return false;
@@ -85,7 +90,7 @@ export class QuadTree {
 		this.divided = true;
 	}
 
-	query_by_point(x: number, y: number, found: Shape[] = []) {
+	queryByPoint(x: number, y: number, found: Shape[] = []) {
 		if (!this.boundary.contains(x, y)) return found;
 
 		for (const shape of this.shapes) {
@@ -93,10 +98,10 @@ export class QuadTree {
 		}
 
 		if (this.divided) {
-			this.northwest!.query_by_point(x, y, found);
-			this.northeast!.query_by_point(x, y, found);
-			this.southwest!.query_by_point(x, y, found);
-			this.southeast!.query_by_point(x, y, found);
+			this.northwest!.queryByPoint(x, y, found);
+			this.northeast!.queryByPoint(x, y, found);
+			this.southwest!.queryByPoint(x, y, found);
+			this.southeast!.queryByPoint(x, y, found);
 		}
 
 		return found;
@@ -119,20 +124,25 @@ export class QuadTree {
 		return false;
 	}
 
-	query_by_range(range: AABB, found: Shape[] = []): Shape[] {
+	queryByRange(range: AABB, found: Shape[] = []): Shape[] {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
-			const points = shape.dimensions();
+			const [top, right, bottom, left] = shape.coordinates;
+
+			const points = [
+				{ x: left, y: top },
+				{ x: right, y: bottom }
+			];
 
 			if (points.every((p) => range.contains(p.x, p.y))) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.query_by_range(range, found);
-			this.northeast!.query_by_range(range, found);
-			this.southwest!.query_by_range(range, found);
-			this.southeast!.query_by_range(range, found);
+			this.northwest!.queryByRange(range, found);
+			this.northeast!.queryByRange(range, found);
+			this.southwest!.queryByRange(range, found);
+			this.southeast!.queryByRange(range, found);
 		}
 
 		return found;
