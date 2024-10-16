@@ -1,14 +1,7 @@
 <script lang="ts">
-	import { create_shape } from '$lib/shape.svelte';
+	import { createShape } from '$lib/shape.svelte';
 	import { AABB, QuadTree } from '$lib/qtree';
-	import type {
-		Shape,
-		RoughOptions,
-		Tools,
-		CursorGlyph,
-		EdgeSide,
-		HoverDirection
-	} from '$lib/types';
+	import type { Shape, RoughOptions, Tools, Cursor, Compass } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { RoughGenerator } from 'roughjs/bin/generator';
@@ -18,7 +11,7 @@
 	type Props = {
 		tool: Tools;
 		behavior: 'select' | 'drag' | 'resize' | 'default';
-		cursor_glyph: CursorGlyph;
+		cursor_glyph: Cursor;
 		drawing: boolean;
 		selecting: boolean;
 		draw: () => void;
@@ -50,6 +43,7 @@
 	const dpr = window.devicePixelRatio;
 
 	const shapes: Shape[] = $state([]);
+	let found: Shape[] = $state([]);
 	let shape: Shape | null = $state(null);
 
 	let mouse = $state({ x: 0, y: 0 });
@@ -68,7 +62,7 @@
 
 	let target: Shape | null = $state(null);
 
-	let direction: HoverDirection = $state('none');
+	let direction: Compass = $state('none');
 
 	function refresh() {
 		context.clearRect(0, 0, canvas.width, canvas.height);
@@ -84,27 +78,28 @@
 		switch (tool) {
 			case 'pointer':
 				if (box.contains(x, y)) {
-					box.update_offset(x, y);
+					box.mousedown(x, y);
 					drag();
 				} else if (box.intersects(x, y)) {
-					direction = box.detect_hover_direction(x, y);
+					direction = box.getMouseDirection(x, y);
 					resize();
 				} else {
 					cursor_glyph = qtree.has(x, y) ? 'move' : 'default';
 
+					found = [];
 					refresh();
 					select();
 					box.clean();
 
-					const found: Shape[] = [];
-
-					qtree.query_by_point(x, y, found);
+					qtree.queryByPoint(x, y, found);
 
 					const [target] = found;
 
 					if (target) {
 						box.add(target);
 						box.draw(rough);
+						box.mousedown(x, y);
+						drag();
 					} else {
 						cursor_glyph = 'default';
 						behavior = 'select';
@@ -119,7 +114,7 @@
 
 				box.clean();
 
-				shape = create_shape(tool, x, y, 0, 0, options);
+				shape = createShape(tool, x, y, 0, 0, options);
 
 				break;
 		}
@@ -129,14 +124,12 @@
 		const x = event.offsetX * devicePixelRatio;
 		const y = event.offsetY * devicePixelRatio;
 
-		const found: Shape[] = [];
-
 		switch (tool) {
 			case 'pointer':
 				switch (behavior) {
 					case 'select':
 						const range = new AABB(mouse.x, mouse.y, x - mouse.x, y - mouse.y);
-						qtree.query_by_range(range, found);
+						qtree.queryByRange(range, found);
 						found.forEach((target) => box.add(target));
 						break;
 
@@ -153,11 +146,15 @@
 						break;
 
 					default:
-						if (box.contains(x, y)) {
-							cursor_glyph = 'move';
+						if (box.isEmpty()) {
+							cursor_glyph = qtree.has(x, y) ? 'move' : 'default';
 						} else {
-							const direction = box.detect_hover_direction(x, y);
-							cursor_glyph = EDGES_GLYPH[direction];
+							if (box.contains(x, y)) {
+								cursor_glyph = 'move';
+							} else {
+								const direction = box.getMouseDirection(x, y);
+								cursor_glyph = EDGES_GLYPH[direction];
+							}
 						}
 						break;
 				}
@@ -165,7 +162,7 @@
 			case 'rectangle':
 			case 'ellipse':
 			case 'line':
-				if (!shape) break;
+				if (!shape) return;
 
 				if (shape) {
 					refresh();

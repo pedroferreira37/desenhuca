@@ -1,5 +1,5 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { Shape, Point, RoughOptions, HoverDirection } from './types';
+import type { Shape, Point, RoughOptions, Compass } from './types';
 
 const VERTICE_SIZE = 14;
 const BOX_MARGIN = 5;
@@ -18,9 +18,7 @@ export class BoundingBox {
 	width: number = $state(0);
 	height: number = $state(0);
 
-	targets: Set<Shape> = $state(new Set());
-
-	offset: Map<Shape, Point> = $state(new Map());
+	childrens: Set<Shape> = $state(new Set());
 
 	norwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
 	northeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
@@ -33,24 +31,20 @@ export class BoundingBox {
 		this.options = options;
 	}
 
-	add(target: Shape | null) {
-		if (!target) return;
-
-		this.targets.add(target);
+	add(target: Shape) {
+		this.childrens.add(target);
 		this.compute();
 	}
 
-	update_offset(x: number, y: number) {
-		this.targets.forEach((target) => {
-			this.offset.set(target, {
-				x: x - target.x,
-				y: y - target.y
-			});
+	mousedown(x: number, y: number) {
+		this.childrens.forEach((child) => {
+			const [top, , , left] = child.coordinates;
+			child.offset = { x: x - left, y: y - top };
 		});
 	}
 
 	clean() {
-		this.targets.clear();
+		this.childrens.clear();
 		this.compute();
 	}
 
@@ -63,11 +57,11 @@ export class BoundingBox {
 		);
 	}
 
-	detect_hover_direction(x: number, y: number): HoverDirection {
-		if (this.northeast.intersects(x, y)) return 'nor_east';
-		if (this.southwest.intersects(x, y)) return 'south_west';
-		if (this.southeast.intersects(x, y)) return 'south_east';
-		if (this.norwest.intersects(x, y)) return 'nor_west';
+	getMouseDirection(x: number, y: number): Compass {
+		if (this.northeast.intersects(x, y)) return 'nor-east';
+		if (this.southwest.intersects(x, y)) return 'south-west';
+		if (this.southeast.intersects(x, y)) return 'south-east';
+		if (this.norwest.intersects(x, y)) return 'nor-west';
 
 		if (
 			x < this.x - BOX_MARGIN * 2 ||
@@ -77,17 +71,17 @@ export class BoundingBox {
 		)
 			return 'none';
 
-		const left_dist = Math.abs(x - this.x);
-		const right_dist = Math.abs(x - (this.x + this.width));
-		const top_dist = Math.abs(y - this.y);
-		const bottom_dist = Math.abs(y - (this.y + this.height));
+		const leftDist = Math.abs(x - this.x);
+		const rightDist = Math.abs(x - (this.x + this.width));
+		const topDist = Math.abs(y - this.y);
+		const bottomDist = Math.abs(y - (this.y + this.height));
 
-		const min = Math.min(left_dist, right_dist, top_dist, bottom_dist);
+		const minDist = Math.min(leftDist, rightDist, topDist, bottomDist);
 
-		if (min === left_dist) return 'left';
-		if (min === right_dist) return 'right';
-		if (min === top_dist) return 'top';
-		if (min === bottom_dist) return 'bottom';
+		if (minDist === leftDist) return 'west';
+		if (minDist === rightDist) return 'east';
+		if (minDist === topDist) return 'north';
+		if (minDist === bottomDist) return 'south';
 
 		return 'none';
 	}
@@ -102,49 +96,101 @@ export class BoundingBox {
 	}
 
 	move(x: number, y: number) {
-		this.targets.forEach((target) => {
-			const offset = this.offset.get(target);
-			target.move(x, y, offset as Point);
+		this.childrens.forEach((child) => {
+			child.move(x, y);
 		});
 
 		this.compute();
 	}
 
-	resize(direction: HoverDirection, x: number, y: number) {
-		const prev_width = this.width;
-		const prev_height = this.height;
+	resize(direction: Compass, x: number, y: number) {
+		const initialX = this.x;
+		const initialY = this.y;
+		const initialWidth = this.width;
+		const initialHeight = this.height;
 
-		this.width = x - this.x;
-		this.height = y - this.y;
+		// this.width = x - this.x;
+		// this.height = y - this.y;
 
-		this.targets.forEach((target) => {
-			target.resize_proportionally(
+		switch (direction) {
+			case 'east':
+				this.width = x - this.x;
+				break;
+			case 'west':
+				const rightDist = this.x + this.width;
+				this.x = x;
+				this.width = rightDist - x;
+				break;
+			case 'north':
+				const bottomDist = this.y + this.height;
+				this.y = y;
+				this.height = bottomDist - y;
+				break;
+			case 'south':
+				this.height = y - this.y;
+				break;
+			case 'south-east':
+				this.width = x - this.x;
+				this.height = y - this.y;
+				break;
+			case 'nor-west':
+				const east = this.x + this.width;
+				const south = this.y + this.height;
+				this.x = x;
+				this.width = east - x;
+				this.y = y;
+				this.height = south - y;
+				break;
+			case 'south-west':
+				const northeast = this.x + this.width;
+				const north = this.y;
+				this.height = y - north;
+				this.width = northeast - x;
+				this.x = x;
+				break;
+			case 'nor-east':
+				const ne = this.y + this.height;
+				this.width = x - this.x;
+				this.height = ne - y;
+				this.y = y;
+				break;
+		}
+
+		this.childrens.forEach((child) => {
+			const [top, right, bottom, left] = child.coordinates;
+
+			child.resize(x, y, {
 				direction,
-				{
-					x: this.x,
-					y: this.y,
-					height: this.height,
-					width: this.width
-				},
-				prev_width,
-				prev_height
-			);
+				parent: [this.x, this.y, this.width, this.height],
+				proportions: [
+					(top - initialY) / initialHeight,
+					(right - initialX) / initialWidth,
+					(bottom - initialY) / initialHeight,
+					(left - initialX) / initialWidth
+				]
+			});
 		});
 
 		this.compute();
 	}
 
 	private compute() {
-		const targets = [...this.targets.values()];
+		const coordinates = [...this.childrens.values()].map((child) => child.coordinates);
+		/* 
+		[
+			[1, 2, 3, 4],
+			[1, 2, 3, 4]
+		]
+	*/
 
-		const x = Math.min(...targets.map((target) => target.x));
-		const y = Math.min(...targets.map((target) => target.y));
+		const x = Math.min(...coordinates.map(([, , , left]) => left));
+		const y = Math.min(...coordinates.map(([top]) => top));
 
-		const max_x = Math.max(...targets.map((target) => target.x + target.width));
-		const max_y = Math.max(...targets.map((target) => target.y + target.height));
+		const maxWidth = Math.max(...coordinates.map(([, right]) => right));
+		const maxHeight = Math.max(...coordinates.map(([, , bottom]) => bottom));
 
-		const width = max_x - x;
-		const height = max_y - y;
+		const width = maxWidth - x;
+		const height = maxHeight - y;
 
 		this.x = x - BOX_MARGIN;
 		this.y = y - BOX_MARGIN;
@@ -159,12 +205,12 @@ export class BoundingBox {
 			this.y + this.height - VERTICE_SIZE / 2
 		);
 
-		if (this.targets.size > 1) this.options.strokeLineDash = [5, 5];
+		if (this.childrens.size > 1) this.options.strokeLineDash = [5, 5];
 		else this.options.strokeLineDash = [0, 0];
 	}
 
 	draw(rough: RoughCanvas): void {
-		if (this.targets.size === 0) return;
+		if (this.childrens.size === 0) return;
 
 		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
 
@@ -174,8 +220,8 @@ export class BoundingBox {
 		this.southeast.draw(rough);
 	}
 
-	is_empty() {
-		return this.targets.size === 0;
+	isEmpty() {
+		return this.childrens.size === 0;
 	}
 }
 
