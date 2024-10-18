@@ -1,5 +1,5 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { Shape, Compass, RoughOptions, ShapeType, ResizeOptions } from './types';
+import type { Shape, RoughOptions, ShapeType, ResizeOptions } from './types';
 import type { Point } from './types';
 import { ShapeKind } from './consts';
 
@@ -25,6 +25,18 @@ export class Rectangle implements Shape {
 		this.y = y - this.offset.y;
 	}
 
+	normalize() {
+		const min_x = Math.min(this.x, this.x + this.width);
+		const max_x = Math.max(this.x, this.x + this.width);
+		const min_y = Math.min(this.y, this.y + this.height);
+		const max_y = Math.max(this.y, this.y + this.height);
+
+		this.x = min_x;
+		this.width = max_x - min_x;
+		this.y = min_y;
+		this.height = max_y - min_y;
+	}
+
 	resize(x: number, y: number, options: ResizeOptions) {
 		if (!options) {
 			this.width = x - this.x;
@@ -32,28 +44,28 @@ export class Rectangle implements Shape {
 			return;
 		}
 
-		const [parentX, parentY, parentWidth, parentHeight] = options.parent;
-		const [proportionTop, proportionRight, proportionBottom, proportionLeft] = options.proportions;
+		const [parent_x, parent_y, parent_width, parent_height] = options.parent;
+		const [top_ratio, right_ratio, bottom_ratio, left_ratio] = options.proportions;
 
 		switch (options.direction) {
 			case 'east':
 			case 'west':
-				this.x = parentX + proportionLeft * parentWidth;
-				this.width = proportionRight * parentWidth - proportionLeft * parentWidth;
+				this.x = parent_x + left_ratio * parent_width;
+				this.width = right_ratio * parent_width - left_ratio * parent_width;
 				break;
 			case 'north':
 			case 'south':
-				this.y = parentY + proportionTop * parentHeight;
-				this.height = proportionBottom * parentHeight - proportionTop * parentHeight;
+				this.y = parent_y + top_ratio * parent_height;
+				this.height = bottom_ratio * parent_height - top_ratio * parent_height;
 				break;
 			case 'nor-west':
 			case 'south-east':
 			case 'nor-east':
 			case 'south-west':
-				this.y = parentY + proportionTop * parentHeight;
-				this.x = parentX + proportionLeft * parentWidth;
-				this.height = proportionBottom * parentHeight - proportionTop * parentHeight;
-				this.width = proportionRight * parentWidth - proportionLeft * parentWidth;
+				this.y = parent_y + top_ratio * parent_height;
+				this.x = parent_x + left_ratio * parent_width;
+				this.height = bottom_ratio * parent_height - top_ratio * parent_height;
+				this.width = right_ratio * parent_width - left_ratio * parent_width;
 				break;
 		}
 	}
@@ -93,7 +105,7 @@ export class Rectangle implements Shape {
 	}
 }
 
-export function createShape(
+export function create_shape(
 	type: ShapeType,
 	x: number,
 	y: number,

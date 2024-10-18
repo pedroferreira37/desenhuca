@@ -31,8 +31,8 @@ export class BoundingBox {
 		this.options = options;
 	}
 
-	add(target: Shape) {
-		this.childrens.add(target);
+	add(child: Shape) {
+		this.childrens.add(child);
 		this.compute();
 	}
 
@@ -57,7 +57,7 @@ export class BoundingBox {
 		);
 	}
 
-	getMouseDirection(x: number, y: number): Compass {
+	get_mouse_direction(x: number, y: number): Compass {
 		if (this.northeast.intersects(x, y)) return 'nor-east';
 		if (this.southwest.intersects(x, y)) return 'south-west';
 		if (this.southeast.intersects(x, y)) return 'south-east';
@@ -71,17 +71,17 @@ export class BoundingBox {
 		)
 			return 'none';
 
-		const leftDist = Math.abs(x - this.x);
-		const rightDist = Math.abs(x - (this.x + this.width));
-		const topDist = Math.abs(y - this.y);
-		const bottomDist = Math.abs(y - (this.y + this.height));
+		const left_dist = Math.abs(x - this.x);
+		const right_dist = Math.abs(x - (this.x + this.width));
+		const top_dist = Math.abs(y - this.y);
+		const bottom_dist = Math.abs(y - (this.y + this.height));
 
-		const minDist = Math.min(leftDist, rightDist, topDist, bottomDist);
+		const min_dist = Math.min(left_dist, right_dist, top_dist, bottom_dist);
 
-		if (minDist === leftDist) return 'west';
-		if (minDist === rightDist) return 'east';
-		if (minDist === topDist) return 'north';
-		if (minDist === bottomDist) return 'south';
+		if (min_dist === left_dist) return 'west';
+		if (min_dist === right_dist) return 'east';
+		if (min_dist === top_dist) return 'north';
+		if (min_dist === bottom_dist) return 'south';
 
 		return 'none';
 	}
@@ -104,13 +104,10 @@ export class BoundingBox {
 	}
 
 	resize(direction: Compass, x: number, y: number) {
-		const initialX = this.x;
-		const initialY = this.y;
-		const initialWidth = this.width;
-		const initialHeight = this.height;
-
-		// this.width = x - this.x;
-		// this.height = y - this.y;
+		const initial_x = this.x;
+		const initial_y = this.y;
+		const initial_width = this.width;
+		const initial_height = this.height;
 
 		switch (direction) {
 			case 'east':
@@ -163,10 +160,10 @@ export class BoundingBox {
 				direction,
 				parent: [this.x, this.y, this.width, this.height],
 				proportions: [
-					(top - initialY) / initialHeight,
-					(right - initialX) / initialWidth,
-					(bottom - initialY) / initialHeight,
-					(left - initialX) / initialWidth
+					(top - initial_y) / initial_height,
+					(right - initial_x) / initial_width,
+					(bottom - initial_y) / initial_height,
+					(left - initial_x) / initial_width
 				]
 			});
 		});
@@ -212,6 +209,9 @@ export class BoundingBox {
 	draw(rough: RoughCanvas): void {
 		if (this.childrens.size === 0) return;
 
+		if (this.childrens.size > 1) this.options.strokeLineDash = [5, 5];
+		else this.options.strokeLineDash = [0, 0];
+
 		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
 
 		this.norwest.draw(rough);
@@ -220,7 +220,7 @@ export class BoundingBox {
 		this.southeast.draw(rough);
 	}
 
-	isEmpty() {
+	is_empty() {
 		return this.childrens.size === 0;
 	}
 }

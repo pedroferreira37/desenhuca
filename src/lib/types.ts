@@ -17,6 +17,7 @@ export interface Shape {
 	draw(rough: RoughCanvas): void;
 	intersects(x: number, y: number): boolean;
 	contains(x: number, y: number): boolean;
+	normalize(): void;
 }
 
 export interface Point {

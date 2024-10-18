@@ -3,7 +3,8 @@
 	import Lasso from '$lib/components/Lasso.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import type { Cursor, Tools } from '$lib/types';
-	import { switchToolByKey } from '$lib/util';
+	import { select_tool_by_key } from '$lib/util';
+	import { get } from 'svelte/store';
 
 	let tool: Tools = $state('pointer');
 	let behavior: 'select' | 'drag' | 'resize' | 'default' = $state('default');
@@ -13,17 +14,17 @@
 	let drawing: boolean = $state(false);
 	let selecting: boolean = $state(false);
 
-	let prevMouse = $state({ x: 0, y: 0 });
+	let prev_mouse = $state({ x: 0, y: 0 });
 	let mouse = $state({ x: 0, y: 0 });
 
-	function isPointerEvsBlocked(behavior: 'select' | 'drag' | 'resize' | 'default') {
+	function is_pointer_evs_blocked(behavior: 'select' | 'drag' | 'resize' | 'default') {
 		return behavior === 'drag' || behavior === 'resize' || behavior === 'select';
 	}
 </script>
 
 <main class="absolute top-0 left-0 w-full h-full">
 	<div
-		class:pointer-events-none={drawing || selecting || isPointerEvsBlocked(behavior)}
+		class:pointer-events-none={drawing || selecting || is_pointer_evs_blocked(behavior)}
 		class="relative flex justify-center w-full h-full overflow-hidden"
 	>
 		<div class="absolute z-10 shadow-sm max-w-full bottom-4">
@@ -48,10 +49,10 @@
 	<div class="w-full h-full absolute top-0 left-0">
 		{#if behavior === 'select'}
 			<Lasso
-				x={prevMouse.x}
-				y={prevMouse.y}
-				width={mouse.x - prevMouse.x}
-				height={mouse.y - prevMouse.y}
+				x={prev_mouse.x}
+				y={prev_mouse.y}
+				width={mouse.x - prev_mouse.x}
+				height={mouse.y - prev_mouse.y}
 				completed={() => (selecting = false)}
 			/>
 		{/if}
@@ -89,8 +90,8 @@
 		const x = event.offsetX;
 		const y = event.offsetY;
 
-		prevMouse.x = x;
-		prevMouse.y = y;
+		prev_mouse.x = x;
+		prev_mouse.y = y;
 	}}
 	onpointermove={(event) => {
 		const x = event.offsetX;
@@ -104,7 +105,7 @@
 	}}
 	onkeydown={(event) => {
 		const key = event.key;
-		tool = switchToolByKey(key);
+		tool = select_tool_by_key(key);
 
 		if (tool === 'rectangle') {
 			cursor_glyph = 'crosshair';

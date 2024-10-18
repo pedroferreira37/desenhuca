@@ -90,7 +90,7 @@ export class QuadTree {
 		this.divided = true;
 	}
 
-	queryByPoint(x: number, y: number, found: Shape[] = []) {
+	query_at(x: number, y: number, found: Shape[] = []) {
 		if (!this.boundary.contains(x, y)) return found;
 
 		for (const shape of this.shapes) {
@@ -98,10 +98,10 @@ export class QuadTree {
 		}
 
 		if (this.divided) {
-			this.northwest!.queryByPoint(x, y, found);
-			this.northeast!.queryByPoint(x, y, found);
-			this.southwest!.queryByPoint(x, y, found);
-			this.southeast!.queryByPoint(x, y, found);
+			this.northwest!.query_at(x, y, found);
+			this.northeast!.query_at(x, y, found);
+			this.southwest!.query_at(x, y, found);
+			this.southeast!.query_at(x, y, found);
 		}
 
 		return found;
@@ -124,7 +124,7 @@ export class QuadTree {
 		return false;
 	}
 
-	queryByRange(range: AABB, found: Shape[] = []): Shape[] {
+	query_in_range(range: AABB, found: Shape[] = []): Shape[] {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
@@ -139,10 +139,10 @@ export class QuadTree {
 		}
 
 		if (this.divided) {
-			this.northwest!.queryByRange(range, found);
-			this.northeast!.queryByRange(range, found);
-			this.southwest!.queryByRange(range, found);
-			this.southeast!.queryByRange(range, found);
+			this.northwest!.query_in_range(range, found);
+			this.northeast!.query_in_range(range, found);
+			this.southwest!.query_in_range(range, found);
+			this.southeast!.query_in_range(range, found);
 		}
 
 		return found;
