@@ -1,28 +1,21 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 import type { Options } from 'roughjs/bin/core';
-import type { ShapeKind } from './consts';
+import { Vector } from './math/vector';
 
-export interface ResizeOptions {
-	direction: Compass;
-	parent: number[];
-	proportions: number[];
-}
+export type ShapeType = 'rectangle' | 'ellipse' | 'segment';
 
 export interface Shape {
-	coordinates: number[];
-	offset: Point;
-	customize(options: RoughOptions): void;
+	type: ShapeType;
+	points: Vector[];
+	offset: Vector;
+	center: Vector;
+	customize(options: Options): void;
 	move(x: number, y: number): void;
-	resize(x: number, y: number, options?: ResizeOptions): void;
+	resize(width: number, height: number): void;
 	draw(rough: RoughCanvas): void;
-	intersects(x: number, y: number): boolean;
-	contains(x: number, y: number): boolean;
+	intersects(v: Vector): boolean;
+	contains(v: Vector): boolean;
 	normalize(): void;
-}
-
-export interface Point {
-	x: number;
-	y: number;
 }
 
 export type Cursor =
@@ -34,12 +27,7 @@ export type Cursor =
 	| 'nesw-resize'
 	| 'ns-resize';
 
-type Obligatory<T, K extends keyof T> = T & { [P in K]-?: T[K] };
-
-export type RoughOptions = Obligatory<Options, 'strokeWidth'>;
-
-export type ShapeType = (typeof ShapeKind)[keyof typeof ShapeKind];
-export type Compass =
+export type Direction =
 	| 'west'
 	| 'east'
 	| 'north'
@@ -50,4 +38,7 @@ export type Compass =
 	| 'nor-east'
 	| 'none';
 
-export type Tools = 'pointer' | 'free-hand-draw' | 'erase' | 'pan' | ShapeType;
+export type Tool = 'pointer' | 'pencil' | 'eraser' | 'rectangle' | 'ellipse' | 'segment';
+export type PointerMode = 'select' | 'move' | 'resize' | 'default';
+
+export type ShapeOptions = Partial<Options>;

@@ -16,11 +16,12 @@ export class Rectangle implements DesenhucaShape {
 		this.y = y;
 		this.width = width;
 		this.height = height;
+		this.options = options;
 	}
 
-	move(x: number, y: number, offset_x: number, offset_y: number): void {
-		this.x = x - offset_x;
-		this.y = y - offset_y;
+	move(x: number, y: number): void {
+		this.x = x;
+		this.y = y;
 	}
 
 	resize(x: number, y: number): void {

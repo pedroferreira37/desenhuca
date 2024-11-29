@@ -1,5 +1,7 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { Shape, Point, RoughOptions, Compass } from './types';
+import type { Shape, ShapeOptions, Direction } from './types';
+import { Vector } from './math/vector';
+import { scale } from 'svelte/transition';
 
 const VERTICE_SIZE = 14;
 const BOX_MARGIN = 5;
@@ -18,63 +20,77 @@ export class BoundingBox {
 	width: number = $state(0);
 	height: number = $state(0);
 
-	childrens: Set<Shape> = $state(new Set());
+	private items: Shape[] = $state([]);
 
-	norwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-	northeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-	southwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-	southeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	private dot: Vector = new Vector(0, 0);
 
-	options: RoughOptions;
+	public side: Direction | null = $state(null);
 
-	constructor(options: RoughOptions) {
+	private snapshot: Map<Shape, Vector[]> = new Map();
+
+	private norwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	private northeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	private southwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+	private southeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
+
+	private options: ShapeOptions;
+
+	constructor(options: ShapeOptions) {
 		this.options = options;
 	}
 
-	add(child: Shape) {
-		this.childrens.add(child);
-		this.compute();
+	keep(item: Shape) {
+		this.items.push(item);
+		this.compute_dimensions();
 	}
 
-	mousedown(x: number, y: number) {
-		this.childrens.forEach((child) => {
-			const [top, , , left] = child.coordinates;
-			child.offset = { x: x - left, y: y - top };
-		});
+	clear() {
+		this.items = [];
+		this.compute_dimensions();
 	}
 
-	clean() {
-		this.childrens.clear();
-		this.compute();
+	update_items_offset(v: Vector) {
+		for (let i = 0; i < this.items.length; i++) {
+			const item = this.items[i];
+			const [a] = item.points;
+			item.offset = v.substract(a);
+		}
 	}
 
-	contains(x: number, y: number): boolean {
+	capture_snapshot() {
+		for (let i = 0; i < this.items.length; i++) {
+			const item = this.items[i];
+			this.snapshot.set(item, item.points);
+		}
+	}
+
+	contains(v: Vector): boolean {
 		return (
-			x > this.x + BOX_MARGIN &&
-			x < this.x + this.width - BOX_MARGIN &&
-			y > this.y + BOX_MARGIN &&
-			y < this.y + this.height - BOX_MARGIN
+			v.x > this.x + BOX_MARGIN &&
+			v.x < this.x + this.width - BOX_MARGIN &&
+			v.y > this.y + BOX_MARGIN &&
+			v.y < this.y + this.height - BOX_MARGIN
 		);
 	}
 
-	get_mouse_direction(x: number, y: number): Compass {
-		if (this.northeast.intersects(x, y)) return 'nor-east';
-		if (this.southwest.intersects(x, y)) return 'south-west';
-		if (this.southeast.intersects(x, y)) return 'south-east';
-		if (this.norwest.intersects(x, y)) return 'nor-west';
+	find_pointer_side(v: Vector): Direction {
+		if (this.northeast.intersects(v)) return 'nor-east';
+		if (this.southwest.intersects(v)) return 'south-west';
+		if (this.southeast.intersects(v)) return 'south-east';
+		if (this.norwest.intersects(v)) return 'nor-west';
 
 		if (
-			x < this.x - BOX_MARGIN * 2 ||
-			x > this.x + this.width + BOX_MARGIN * 2 ||
-			y < this.y - BOX_MARGIN * 2 ||
-			y > this.y + this.height + BOX_MARGIN * 2
+			v.x < this.x - BOX_MARGIN * 2 ||
+			v.x > this.x + this.width + BOX_MARGIN * 2 ||
+			v.y < this.y - BOX_MARGIN * 2 ||
+			v.y > this.y + this.height + BOX_MARGIN * 2
 		)
 			return 'none';
 
-		const left_dist = Math.abs(x - this.x);
-		const right_dist = Math.abs(x - (this.x + this.width));
-		const top_dist = Math.abs(y - this.y);
-		const bottom_dist = Math.abs(y - (this.y + this.height));
+		const left_dist = Math.abs(v.x - this.x);
+		const right_dist = Math.abs(v.x - (this.x + this.width));
+		const top_dist = Math.abs(v.y - this.y);
+		const bottom_dist = Math.abs(v.y - (this.y + this.height));
 
 		const min_dist = Math.min(left_dist, right_dist, top_dist, bottom_dist);
 
@@ -86,113 +102,88 @@ export class BoundingBox {
 		return 'none';
 	}
 
-	intersects(x: number, y: number): boolean {
+	intersects(v: Vector): boolean {
 		return !(
-			x < this.x - BOX_MARGIN * 2 ||
-			x > this.x + this.width + BOX_MARGIN * 2 ||
-			y < this.y - BOX_MARGIN * 2 ||
-			y > this.y + this.height + BOX_MARGIN * 2
+			v.x < this.x - BOX_MARGIN * 2 ||
+			v.x > this.x + this.width + BOX_MARGIN * 2 ||
+			v.y < this.y - BOX_MARGIN * 2 ||
+			v.y > this.y + this.height + BOX_MARGIN * 2
 		);
 	}
 
-	move(x: number, y: number) {
-		this.childrens.forEach((child) => {
-			child.move(x, y);
-		});
-
-		this.compute();
-	}
-
-	resize(direction: Compass, x: number, y: number) {
-		const initial_x = this.x;
-		const initial_y = this.y;
-		const initial_width = this.width;
-		const initial_height = this.height;
-
-		switch (direction) {
-			case 'east':
-				this.width = x - this.x;
-				break;
-			case 'west':
-				const rightDist = this.x + this.width;
-				this.x = x;
-				this.width = rightDist - x;
-				break;
-			case 'north':
-				const bottomDist = this.y + this.height;
-				this.y = y;
-				this.height = bottomDist - y;
-				break;
-			case 'south':
-				this.height = y - this.y;
-				break;
-			case 'south-east':
-				this.width = x - this.x;
-				this.height = y - this.y;
-				break;
-			case 'nor-west':
-				const east = this.x + this.width;
-				const south = this.y + this.height;
-				this.x = x;
-				this.width = east - x;
-				this.y = y;
-				this.height = south - y;
-				break;
-			case 'south-west':
-				const northeast = this.x + this.width;
-				const north = this.y;
-				this.height = y - north;
-				this.width = northeast - x;
-				this.x = x;
-				break;
-			case 'nor-east':
-				const ne = this.y + this.height;
-				this.width = x - this.x;
-				this.height = ne - y;
-				this.y = y;
-				break;
+	move(v: Vector) {
+		for (let i = 0; i < this.items.length; i++) {
+			const item = this.items[i];
+			const [dx, dy] = v.substract(item.offset);
+			item.move(dx, dy);
 		}
 
-		this.childrens.forEach((child) => {
-			const [top, right, bottom, left] = child.coordinates;
-
-			child.resize(x, y, {
-				direction,
-				parent: [this.x, this.y, this.width, this.height],
-				proportions: [
-					(top - initial_y) / initial_height,
-					(right - initial_x) / initial_width,
-					(bottom - initial_y) / initial_height,
-					(left - initial_x) / initial_width
-				]
-			});
-		});
-
-		this.compute();
+		this.compute_dimensions();
 	}
 
-	private compute() {
-		const coordinates = [...this.childrens.values()].map((child) => child.coordinates);
-		/* 
-		[
-			[1, 2, 3, 4],
-			[1, 2, 3, 4]
-		]
-	*/
+	resize(prev_mouse: Vector, mouse: Vector, anchor: Vector) {
+		const [sx, sy] = mouse.substract(anchor).divide(prev_mouse.substract(anchor));
 
-		const x = Math.min(...coordinates.map(([, , , left]) => left));
-		const y = Math.min(...coordinates.map(([top]) => top));
+		this.items.forEach((item) => {
+			const old_vecs = this.snapshot.get(item);
 
-		const maxWidth = Math.max(...coordinates.map(([, right]) => right));
-		const maxHeight = Math.max(...coordinates.map(([, , bottom]) => bottom));
+			if (!old_vecs) return;
 
-		const width = maxWidth - x;
-		const height = maxHeight - y;
+			const [a, , , d] = old_vecs;
 
-		this.x = x - BOX_MARGIN;
-		this.y = y - BOX_MARGIN;
-		this.width = width + BOX_MARGIN * 2;
-		this.height = height + BOX_MARGIN * 2;
+			const [dx, dy] = a.substract(anchor).scale(sx, sy).sum(anchor);
+			const [width, height] = d.substract(a).scale(sx, sy);
+
+			switch (this.side) {
+				case 'east':
+				case 'west':
+					item.move(dx, a.y);
+					item.resize(width, d.substract(a).y);
+					break;
+				case 'north':
+				case 'south':
+					item.move(a.x, dy);
+					item.resize(d.substract(a).x, height);
+					break;
+				case 'nor-east':
+				case 'nor-west':
+				case 'south-east':
+				case 'south-west':
+					item.move(dx, dy);
+					item.resize(width, height);
+					break;
+			}
+
+			if (sx < 0 || sy < 0) item.normalize();
+		});
+
+		this.compute_dimensions();
+	}
+
+	private compute_dimensions() {
+		let min_vec = new Vector(Infinity, Infinity);
+		let max_vec = new Vector(-Infinity, -Infinity);
+
+		this.items.forEach((item) => {
+			if (item.type === 'rectangle') {
+				const [a, , , d] = item.points;
+
+				min_vec = min_vec.min(a);
+				max_vec = max_vec.max(d);
+			}
+
+			if (item.type === 'ellipse') {
+				const [a, , , d] = item.points;
+
+				min_vec = min_vec.min(a);
+				max_vec = max_vec.max(d);
+			}
+		});
+
+		this.x = min_vec.x;
+		this.y = min_vec.y;
+		this.width = max_vec.substract(min_vec).x;
+		this.height = max_vec.substract(min_vec).y;
 
 		this.norwest.move(this.x - VERTICE_SIZE / 2, this.y - VERTICE_SIZE / 2);
 		this.northeast.move(this.x + this.width - VERTICE_SIZE / 2, this.y - VERTICE_SIZE / 2);
@@ -202,14 +193,14 @@ export class BoundingBox {
 			this.y + this.height - VERTICE_SIZE / 2
 		);
 
-		if (this.childrens.size > 1) this.options.strokeLineDash = [5, 5];
+		if (this.items.length > 1) this.options.strokeLineDash = [5, 5];
 		else this.options.strokeLineDash = [0, 0];
 	}
 
 	draw(rough: RoughCanvas): void {
-		if (this.childrens.size === 0) return;
+		if (this.items.length === 0) return;
 
-		if (this.childrens.size > 1) this.options.strokeLineDash = [5, 5];
+		if (this.items.length > 1) this.options.strokeLineDash = [5, 5];
 		else this.options.strokeLineDash = [0, 0];
 
 		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
@@ -220,8 +211,17 @@ export class BoundingBox {
 		this.southeast.draw(rough);
 	}
 
+	get points(): Vector[] {
+		return [
+			new Vector(this.x, this.y),
+			new Vector(this.x + this.width, this.y),
+			new Vector(this.x, this.y + this.height),
+			new Vector(this.x + this.width, this.y + this.height)
+		];
+	}
+
 	is_empty() {
-		return this.childrens.size === 0;
+		return this.items.length === 0;
 	}
 }
 
@@ -231,7 +231,7 @@ class Vertice {
 		public y: number,
 		public width: number,
 		public height: number,
-		public options: RoughOptions
+		public options: ShapeOptions
 	) {}
 
 	move(x: number, y: number) {
@@ -243,17 +243,17 @@ class Vertice {
 		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
 	}
 
-	intersects(x: number, y: number): boolean {
+	intersects(v: Vector): boolean {
 		return (
-			x >= this.x - 5 &&
-			x <= this.x + this.width + 5 &&
-			y >= this.y - 5 &&
-			y <= this.y + this.height + 5 &&
+			v.x >= this.x - 5 &&
+			v.x <= this.x + this.width + 5 &&
+			v.y >= this.y - 5 &&
+			v.y <= this.y + this.height + 5 &&
 			!(
-				x >= this.x + 5 &&
-				x <= this.x + this.width - 5 &&
-				y >= this.y + 5 &&
-				y <= this.y + this.height - 5
+				v.x >= this.x + 5 &&
+				v.x <= this.x + this.width - 5 &&
+				v.x >= this.y + 5 &&
+				v.x <= this.y + this.height - 5
 			)
 		);
 	}

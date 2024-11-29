@@ -1,4 +1,5 @@
-import type { Shape, Point } from './types';
+import type { Vector } from './math/vector';
+import type { Shape } from './types';
 
 export class AABB {
 	x: number;
@@ -13,8 +14,10 @@ export class AABB {
 		this.height = height;
 	}
 
-	contains(x: number, y: number): boolean {
-		return x >= this.x && x <= this.x + this.width && y >= this.y && y <= this.y + this.height;
+	contains(v: Vector): boolean {
+		return (
+			v.x >= this.x && v.x <= this.x + this.width && v.y >= this.y && v.y <= this.y + this.height
+		);
 	}
 
 	intersects(range: AABB): boolean {
@@ -44,16 +47,9 @@ export class QuadTree {
 	}
 
 	insert(shape: Shape): boolean {
-		const [top, right, bottom, left] = shape.coordinates;
+		const [a, b] = shape.points;
 
-		const points = [
-			{ x: left, y: top },
-			{ x: right, y: bottom }
-		];
-
-		if (!points.every((p) => this.boundary.contains(p.x, p.y))) {
-			return false;
-		}
+		if (!this.boundary.contains(b) && !this.boundary.contains(b)) return false;
 
 		if (this.shapes.length < this.capacity) {
 			this.shapes.push(shape);
@@ -72,7 +68,7 @@ export class QuadTree {
 		return false;
 	}
 
-	divide() {
+	private divide() {
 		const { x, y, width, height } = this.boundary;
 		const mw = width / 2;
 		const mh = height / 2;
@@ -90,52 +86,47 @@ export class QuadTree {
 		this.divided = true;
 	}
 
-	query_at(x: number, y: number, found: Shape[] = []) {
-		if (!this.boundary.contains(x, y)) return found;
-
+	has(v: Vector): boolean {
 		for (const shape of this.shapes) {
-			if (shape.intersects(x, y)) found.push(shape);
-		}
-
-		if (this.divided) {
-			this.northwest!.query_at(x, y, found);
-			this.northeast!.query_at(x, y, found);
-			this.southwest!.query_at(x, y, found);
-			this.southeast!.query_at(x, y, found);
-		}
-
-		return found;
-	}
-
-	has(x: number, y: number): boolean {
-		for (const shape of this.shapes) {
-			if (shape.intersects(x, y)) return true;
+			if (shape.intersects(v)) return true;
 		}
 
 		if (this.divided) {
 			return (
-				this.northwest!.has(x, y) ||
-				this.northeast!.has(x, y) ||
-				this.southwest!.has(x, y) ||
-				this.southeast!.has(x, y)
+				this.northwest!.has(v) ||
+				this.northeast!.has(v) ||
+				this.southwest!.has(v) ||
+				this.southeast!.has(v)
 			);
 		}
 
 		return false;
 	}
 
+	query_at(v: Vector, found: Shape[] = []) {
+		if (!this.boundary.contains(v)) return found;
+
+		for (const shape of this.shapes) {
+			if (shape.intersects(v)) found.push(shape);
+		}
+
+		if (this.divided) {
+			this.northwest!.query_at(v, found);
+			this.northeast!.query_at(v, found);
+			this.southwest!.query_at(v, found);
+			this.southeast!.query_at(v, found);
+		}
+
+		return found;
+	}
+
 	query_in_range(range: AABB, found: Shape[] = []): Shape[] {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
-			const [top, right, bottom, left] = shape.coordinates;
+			const [a, b] = shape.points;
 
-			const points = [
-				{ x: left, y: top },
-				{ x: right, y: bottom }
-			];
-
-			if (points.every((p) => range.contains(p.x, p.y))) found.push(shape);
+			if (range.contains(a) && range.contains(b)) found.push(shape);
 		}
 
 		if (this.divided) {
@@ -146,16 +137,5 @@ export class QuadTree {
 		}
 
 		return found;
-	}
-
-	visualize(ctx: CanvasRenderingContext2D) {
-		ctx.rect(this.boundary.x, this.boundary.y, this.boundary.width, this.boundary.height);
-		ctx.stroke();
-		if (this.divided) {
-			this.northwest!.visualize(ctx);
-			this.northeast!.visualize(ctx);
-			this.southwest!.visualize(ctx);
-			this.southeast!.visualize(ctx);
-		}
 	}
 }

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Tools } from '$lib/types';
+	import type { Tool } from '$lib/types';
 
 	type Props = {
-		selected: Tools;
+		selected: Tool;
 		pointer: () => void;
 		rectangle: () => void;
 		ellipse: () => void;
@@ -83,7 +83,7 @@
 
 	<li
 		class:bg-slate-200={selected === 'ellipse'}
-		class="rounded hover:bg-slate-200 transition-all flex items-center justify-center"
+		class="rounded hover:bg-slate-200 relative transition-all flex items-center justify-center"
 	>
 		<button class="p-2" onmousedown={() => ellipse()}>
 			<svg
@@ -98,6 +98,7 @@
 				stroke-linejoin="round"
 				class="stroke-stone-700 w-4 h-4"><circle cx="12" cy="12" r="10" /></svg
 			>
+			<p class="text-[12px] text-stone-700 absolute bottom-0 right-0 mr-1">4</p>
 		</button>
 	</li>
 
