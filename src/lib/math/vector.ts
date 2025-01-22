@@ -1,11 +1,8 @@
 export class Vector {
-	public x: number;
-	public y: number;
-
-	constructor(x: number = 0, y: number = 0) {
-		this.x = x;
-		this.y = y;
-	}
+	constructor(
+		public x: number = 0,
+		public y: number = 0
+	) {}
 
 	substract(v: Vector) {
 		return new Vector(this.x - v.x, this.y - v.y);
@@ -22,16 +19,34 @@ export class Vector {
 		return new Vector(this.x + v.x, this.y + v.y);
 	}
 
-	scale(sx: number, sy: number) {
-		return new Vector(this.x * sx, this.y * sy);
+	multiply(v: Vector) {
+		return new Vector(this.x * v.x, this.y * v.y);
 	}
 
-	min(v: Vector) {
-		return new Vector(Math.min(this.x, v.x), Math.min(this.y, v.y));
+	static min(...args: Vector[]) {
+		let min_x = args[0].x;
+		let min_y = args[0].y;
+
+		for (let i = 1; i < args.length; i++) {
+			const arg = args[i];
+			min_x = Math.min(min_x, arg.x);
+			min_y = Math.min(min_y, arg.y);
+		}
+
+		return new Vector(min_x, min_y);
 	}
 
-	max(v: Vector) {
-		return new Vector(Math.max(this.x, v.x), Math.max(this.y, v.y));
+	static max(...args: Vector[]) {
+		let max_x = args[0].x;
+		let max_y = args[0].y;
+
+		for (let i = 1; i < args.length; i++) {
+			const arg = args[i];
+			max_x = Math.max(max_x, arg.x);
+			max_y = Math.max(max_y, arg.y);
+		}
+
+		return new Vector(max_x, max_y);
 	}
 
 	set(x: number, y: number) {

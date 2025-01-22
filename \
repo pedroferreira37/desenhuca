@@ -1,0 +1,421 @@
+<script lang="ts">
+	import { QuadTree } from '$lib/collision/qtree';
+	import { AABB } from '$lib/collision/aabb';
+	import type { Shape, Tool, Cursor, PointerMode, Direction } from '$lib/types';
+	import roughCanvas from 'roughjs';
+	import { RoughCanvas } from 'roughjs/bin/canvas';
+	import type { Options } from 'roughjs/bin/core';
+	import { createShape } from '$lib/shape';
+	import { Vector } from '$lib/math/vector';
+	import { BoundingBox, Box } from '$lib/collision/bounding-box';
+	import { compute_bounding_box } from '$lib/util/util';
+
+	const CURSOR_STYLE_VARIANTS: Record<Direction, Cursor> = {
+		west: 'ew-resize',
+		east: 'ew-resize',
+		north: 'ns-resize',
+		south: 'ns-resize',
+		'south-west': 'nesw-resize',
+		'south-east': 'nwse-resize',
+		'nor-west': 'nwse-resize',
+		'nor-east': 'nesw-resize',
+		none: 'default'
+	};
+
+	type Props = {
+		tool: Tool;
+		pointerMode: PointerMode;
+		cursor: Cursor;
+		drawing: boolean;
+		selecting: boolean;
+		draw: () => void;
+		select: () => void;
+		drag: () => void;
+		defer: () => void;
+		resize: () => void;
+		rotate: () => void;
+	};
+
+	let {
+		tool,
+		pointerMode,
+		cursor = $bindable(),
+		resize,
+		rotate,
+		draw,
+		select,
+		drag,
+		defer
+	}: Props = $props();
+
+	let canvas: HTMLCanvasElement;
+	let context: CanvasRenderingContext2D;
+	let rough: RoughCanvas;
+	let qtree: QuadTree;
+
+	const bbox = new BoundingBox();
+
+	const dpr = window.devicePixelRatio;
+
+	let mouse = $state<Vector>(new Vector(0, 0));
+
+	let shapes = $state<Shape[]>([]);
+	let shape = $state<Shape | null>(null);
+	let bb = $state<Box | null>(null);
+	let results = $state<Shape[]>([]);
+
+	let anchor: Vector = new Vector(0, 0);
+
+	let ptr_direction: Direction | null = null;
+
+	function which_edge_cursor_is(x: number, y: number, bb: BoundingBox | null): Direction | null {
+		if (!bb) return null;
+
+		const MARGIN = 5;
+
+		const vertices = bb.vertices;
+
+		const [nw, sw, ne, se] = vertices;
+
+		if (!(x <= nw.x - MARGIN || x >= nw.x + MARGIN || y <= nw.y - MARGIN || y >= nw.y + MARGIN)) {
+			return 'nor-west';
+		}
+
+		if (!(x <= sw.x - MARGIN || x >= sw.x + MARGIN || y <= sw.y - MARGIN || y >= sw.y + MARGIN)) {
+			return 'south-west';
+		}
+
+		if (!(x <= ne.x - MARGIN || x >= ne.x + MARGIN || y <= ne.y - MARGIN || y >= ne.y + MARGIN)) {
+			return 'south-east';
+		}
+
+		if (!(x <= se.x || x >= se.x + MARGIN || y <= se.y - MARGIN || y >= se.y + MARGIN)) {
+			return 'nor-east';
+		}
+
+		if (
+			x < bb.x - 14 * 2 ||
+			x > bb.x + bb.width + 14 * 2 ||
+			y < bb.y - 14 * 2 ||
+			y > bb.y + bb.height + 14 * 2
+		) {
+			return null;
+		}
+
+		const w = Math.abs(x - bb.x);
+		const e = Math.abs(x - (bb.x + bb.width));
+		const n = Math.abs(y - bb.y);
+		const s = Math.abs(y - (bb.y + bb.height));
+
+		const min = Math.min(w, e, n, s);
+
+		if (min === w) return 'west';
+		if (min === e) return 'east';
+		if (min === n) return 'north';
+		if (min === s) return 'south';
+
+		return null;
+	}
+
+	function set_anchor_pos(x: number, y: number, bb: BoundingBox) {
+		ptr_direction = which_edge_cursor_is(x, y, bb);
+
+		const [nw, , se] = bb.vertices;
+
+		switch (ptr_direction) {
+			case 'east':
+				anchor.set(nw.x, nw.y);
+				break;
+			case 'west':
+				anchor.set(se.x, nw.y);
+				break;
+			case 'south':
+				anchor.set(nw.x, se.y);
+				break;
+			case 'north':
+				anchor.set(nw.x, se.y);
+				break;
+			case 'south-east':
+				anchor.set(nw.x, nw.y);
+				break;
+			case 'south-west':
+				anchor.set(se.x, nw.y);
+				break;
+			case 'nor-west':
+				anchor.set(se.x, se.y);
+				break;
+			case 'nor-east':
+				anchor.set(nw.x, se.y);
+				break;
+		}
+	}
+
+	let default_options = $state<Options>({
+		seed: 4,
+		roughness: 1,
+		strokeWidth: 6
+	});
+
+	function clean() {
+		context.clearRect(0, 0, canvas.width, canvas.height);
+	}
+
+	function redraw() {
+		shapes.forEach((shape) => shape.draw(rough, context));
+	}
+
+	function onpointerdown(event: PointerEvent) {
+		mouse = new Vector(event.offsetX * devicePixelRatio, event.offsetY * devicePixelRatio);
+
+		switch (tool) {
+			case 'pointer':
+				if (!bb) {
+					// if (!bbox.empty) {
+					// 	if (bbox.contains(mouse.x, mouse.y)) {
+					// 		bbox.offset(mouse.x, mouse.y);
+					// 		drag();
+					// 		return;
+					// 	}
+					//
+					// 	if (bbox.intersects(mouse.x, mouse.y)) {
+					// 		bbox.save();
+					// 		set_anchor_pos(mouse.x, mouse.y, bbox);
+					// 		resize();
+					// 		return;
+					// 	}
+					//
+					// 	if (bbox.intersects_handle(mouse.x, mouse.y)) {
+					// 		rotate();
+					// 		return;
+					// 	}
+					// }
+
+					
+					bb = null;
+
+					clean();
+					redraw();
+
+					select();
+
+					results = [];
+
+					qtree.query(
+						{
+							at: new Vector(mouse.x, mouse.y),
+							range: null
+						},
+						results
+					);
+
+					bb = compute_bounding_box(results);
+
+					if (!bb) return;
+
+					bb.draw(rough, context);
+
+					cursor = 'default';
+					pointerMode = 'select';
+				}
+
+				if (bb.contains(mouse.x, mouse.y)) {
+					for (let i = 0; i < results.length; i++) {
+						const s = results[i];
+						const [nw] = s.vertices;
+						s.offset = mouse.substract(nw);
+					}
+
+					drag();
+					return;
+				}
+				break;
+
+			case 'rectangle':
+			case 'ellipse':
+			case 'segment':
+				draw();
+				bbox.clear();
+				shape = createShape(tool, mouse.x, mouse.y, 0, 0, default_options);
+
+				break;
+		}
+	}
+
+	function onpointermove(event: PointerEvent) {
+		requestAnimationFrame(() => {
+			const delta = new Vector(event.offsetX * devicePixelRatio, event.offsetY * devicePixelRatio);
+
+			if (pointerMode !== 'idle') {
+				clean();
+				redraw();
+			}
+
+			switch (tool) {
+				case 'pointer':
+					switch (pointerMode) {
+						case 'select':
+							results = [];
+
+							clean();
+							redraw();
+
+							// bbox.clear();
+
+							const size = delta.substract(mouse);
+
+							const range = new AABB(mouse.x, mouse.y, size.x, size.y);
+
+							range.normalize();
+
+							qtree.query(
+								{
+									at: null,
+									range
+								},
+								results
+							);
+
+							bb = compute_bounding_box(results);
+
+							if (!bb) return;
+
+							bb.draw(rough, context);
+							break;
+						case 'rotate':
+							clean();
+							redraw();
+
+							const rad = (delta.x - mouse.x) * (Math.PI / 180) * 0.1;
+
+							bb = compute_bounding_box(results);
+
+							if (!bb) return;
+
+							bb.draw(rough, context);
+							break;
+						case 'resize':
+							clean();
+							redraw();
+
+							// bbox.resize(ptr_direction, mouse, delta, anchor);
+							// bbox.draw(rough, context);
+							break;
+						case 'move':
+							for (const s of results) {
+								const movt = delta.substract(s.offset);
+								s.move(movt.x, movt.y);
+							}
+
+							bb = compute_bounding_box(results);
+
+							if (!bb) return;
+
+							bb.draw(rough, context);
+							break;
+						default:
+							if (bbox.empty) {
+								cursor = qtree.has(delta.x, delta.y) ? 'move' : 'default';
+								return;
+							}
+
+							if (bbox.intersects_handle(delta.x, delta.y)) {
+								cursor = 'grab';
+								return;
+							}
+
+							if (bbox.contains(delta.x, delta.y)) {
+								cursor = 'move';
+								return;
+							}
+
+							// if (bbox.intersectsPivot(mouse_mov.x, mouse_mov.y)) {
+							// 	cursor = 'grab';
+							// 	return;
+							// }
+
+							const ptr_dir = which_edge_cursor_is(delta.x, delta.y, bbox) || 'none';
+
+							cursor = CURSOR_STYLE_VARIANTS[ptr_dir];
+							break;
+					}
+				case 'rectangle':
+				case 'ellipse':
+				case 'segment':
+					if (shape) {
+						clean();
+						redraw();
+						const [nw] = shape.vertices;
+						const size = delta.substract(nw);
+						shape.resize(size.x, size.y);
+						shape.draw(rough);
+					}
+					break;
+			}
+		});
+	}
+
+	function onpointerup() {
+		defer();
+
+		if (shape) {
+			clean();
+			redraw();
+
+			shape.normalize();
+			shape.draw(rough, context);
+
+			shapes.push(shape);
+
+			qtree.insert(shape);
+
+			results.push(shape);
+
+			bb = compute_bounding_box(results);
+
+			if (bb) bb.draw(rough, context);
+		}
+
+		cursor = 'default';
+
+		shape = null;
+	}
+
+	function config() {
+		context = canvas.getContext('2d') as CanvasRenderingContext2D;
+		rough = roughCanvas.canvas(canvas);
+
+		const rect = canvas.getBoundingClientRect();
+
+		context.scale(dpr, dpr);
+
+		canvas.width = rect.width * dpr;
+		canvas.height = rect.height * dpr;
+
+		canvas.style.width = `${rect.width}px`;
+		canvas.style.height = `${rect.height}px`;
+
+		const boundary = new AABB(0, 0, canvas.width, canvas.height);
+		qtree = new QuadTree(boundary, 4);
+	}
+
+	$effect(config);
+</script>
+
+<!-- /* I dont know how to make this better on svelte If I put cursor in here It'll break my cursor */ -->
+<canvas
+	bind:this={canvas}
+	width={window.innerWidth}
+	height={window.innerHeight}
+	class:cursor-move={cursor === 'move'}
+	class:cursor-crosshair={cursor === 'crosshair'}
+	class:cursor-default={cursor === 'default'}
+	class:cursor-nwse-resize={cursor === 'nwse-resize'}
+	class:cursor-nesw-resize={cursor === 'nesw-resize'}
+	class:cursor-ew-resize={cursor === 'ew-resize'}
+	class:cursor-ns-resize={cursor === 'ns-resize'}
+	class:cursor-grab={cursor === 'grab'}
+	{onpointerdown}
+	{onpointermove}
+	{onpointerup}
+>
+</canvas>

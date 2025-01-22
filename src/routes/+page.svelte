@@ -4,15 +4,10 @@
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { Vector } from '$lib/math/vector';
 	import type { Tool, Cursor, PointerMode } from '$lib/types';
-	import { KeyShortcuts } from '$lib/util';
-
-	type Point = {
-		x: number;
-		y: number;
-	};
+	import { KeyShortcuts } from '$lib/util/util';
 
 	let tool = $state<Tool>('pointer');
-	let pointer_mode = $state<PointerMode>('default');
+	let pointer_mode = $state<PointerMode>('idle');
 
 	let cursor = $state<Cursor | 'default'>('default');
 
@@ -22,14 +17,14 @@
 	let prev_mouse = $state({ x: 0, y: 0 });
 	let mouse = $state({ x: 0, y: 0 });
 
-	function is_pointer_evs_blocked(pointer_mode: PointerMode) {
-		return pointer_mode === 'move' || pointer_mode === 'resize' || pointer_mode === 'select';
+	function is_ptr_evs_blocked(pointerMode: PointerMode) {
+		return pointerMode === 'move' || pointerMode === 'resize' || pointerMode === 'select';
 	}
 </script>
 
 <main class="absolute top-0 left-0 w-full h-full">
 	<div
-		class:pointer-events-none={drawing || selecting || is_pointer_evs_blocked(pointer_mode)}
+		class:pointer-events-none={drawing || selecting || is_ptr_evs_blocked(pointer_mode)}
 		class="relative flex justify-center w-full h-full overflow-hidden"
 	>
 		<div class="absolute z-10 shadow-sm max-w-full bottom-4">
@@ -70,17 +65,20 @@
 
 		<Canvas
 			{tool}
-			{pointer_mode}
+			pointerMode={pointer_mode}
 			{selecting}
 			{drawing}
 			bind:cursor
-			select={() => {
-				pointer_mode = 'select';
-			}}
 			draw={() => (drawing = true)}
 			drag={() => {
 				pointer_mode = 'move';
 				selecting = false;
+			}}
+			rotate={() => {
+				pointer_mode = 'rotate';
+			}}
+			select={() => {
+				pointer_mode = 'select';
 			}}
 			resize={() => {
 				pointer_mode = 'resize';
@@ -88,7 +86,7 @@
 			}}
 			defer={() => {
 				tool = 'pointer';
-				pointer_mode = 'default';
+				pointer_mode = 'idle';
 				selecting = false;
 				drawing = false;
 			}}
