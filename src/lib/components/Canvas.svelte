@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { AABB, QuadTree } from '$lib/qtree';
+	import { QuadTree } from '$lib/collision/qtree';
+	import { AABB } from '$lib/collision/aabb';
 	import type { Shape, Tool, Cursor, PointerMode, Direction } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
-	import { BoundingBox } from '$lib/selection-box.svelte';
-	import { update_anchor_pos } from '$lib/util';
 	import type { Options } from 'roughjs/bin/core';
-	import { create_shape } from '$lib/shape.svelte';
+	import { create_shape } from '$lib/shape';
 	import { Vector } from '$lib/math/vector';
+	import { BoundingBox } from '$lib/collision/bounding-box';
+	import { compute_bounding_box, get_ptr_direction, update_anchor_pos } from '$lib/util/util';
 
-	const CursorStylesVariants: Record<Direction, Cursor> = {
+	const CURSOR_STYLE_VARIANTS: Record<Direction, Cursor> = {
 		west: 'ew-resize',
 		east: 'ew-resize',
 		north: 'ns-resize',
@@ -23,7 +24,7 @@
 
 	type Props = {
 		tool: Tool;
-		pointer_mode: PointerMode;
+		pointerMode: PointerMode;
 		cursor: Cursor;
 		drawing: boolean;
 		selecting: boolean;
@@ -32,13 +33,15 @@
 		drag: () => void;
 		defer: () => void;
 		resize: () => void;
+		rotate: () => void;
 	};
 
 	let {
 		tool,
-		pointer_mode,
+		pointerMode,
 		cursor = $bindable(),
 		resize,
+		rotate,
 		draw,
 		select,
 		drag,
@@ -52,78 +55,105 @@
 
 	const dpr = window.devicePixelRatio;
 
+	let mouse = $state<Vector>(new Vector(0, 0));
+
 	let shapes = $state<Shape[]>([]);
 	let shape = $state<Shape | null>(null);
-	let found = $state<Shape[]>([]);
+	let results = $state<Shape[]>([]);
+	let bb: BoundingBox | null = null;
 
-	let orig_pointer = $state<Vector>(new Vector(0, 0));
+	let anchor: Vector = new Vector(0, 0);
 
-	let anchor = $state<Vector>(new Vector(0, 0));
+	let ptr_direction: Direction | null = null;
 
-	let base_options = $state<Options>({
-		seed: 5,
-		roughness: 3,
-		strokeWidth: 5
+	let default_options = $state<Options>({
+		stroke: 'white',
+		seed: 2,
+		roughness: 4,
+		strokeWidth: 4
 	});
 
-	const box = new BoundingBox({
-		stroke: 'rgba(137, 196, 244, 1)',
-		strokeWidth: 4,
-		seed: 1,
-		roughness: 4
-	});
-
-	function refresh() {
+	function clean() {
 		context.clearRect(0, 0, canvas.width, canvas.height);
-		shapes.forEach((shape) => shape.draw(rough));
+	}
+
+	function redraw() {
+		shapes.forEach((shape) => shape.draw(context, rough));
 	}
 
 	function onpointerdown(event: PointerEvent) {
-		orig_pointer = new Vector(event.offsetX * devicePixelRatio, event.offsetY * devicePixelRatio);
-
-		found = [];
+		mouse = new Vector(
+			Math.floor(event.offsetX * devicePixelRatio),
+			Math.floor(event.offsetY * devicePixelRatio)
+		);
 
 		switch (tool) {
 			case 'pointer':
-				if (!box.is_empty()) {
-					if (box.contains(orig_pointer)) {
-						box.update_items_offset(orig_pointer);
+				if (bb) {
+					if (bb.intersects_pivot(mouse)) {
+						rotate();
+						return;
+					}
+
+					if (bb.contains(mouse)) {
+						for (const s of results) {
+							s.update_offset(mouse.x, mouse.y);
+						}
+
 						drag();
 						return;
 					}
 
-					if (box.intersects(orig_pointer)) {
-						box.capture_snapshot();
-						update_anchor_pos(orig_pointer, anchor, box);
+					if (bb.intersects(mouse)) {
+						for (const s of results) {
+							s.save();
+						}
+
+						update_anchor_pos(mouse, anchor, bb);
+
+						ptr_direction = get_ptr_direction(mouse, bb);
+
 						resize();
 						return;
 					}
 				}
 
-				refresh();
+				clean();
+
+				redraw();
+
 				select();
 
-				box.clear();
+				results = [];
+				bb = null;
 
-				qtree.query_at(orig_pointer, found);
+				qtree.query(
+					{
+						at: new Vector(mouse.x, mouse.y),
+						range: null
+					},
+					results
+				);
 
-				const [target] = found;
-
+				const [target] = results;
 				if (target) {
-					box.keep(target);
-					box.draw(rough);
-					return;
+					bb = target.AABB;
+					bb.draw(context);
 				}
 
 				cursor = 'default';
-				pointer_mode = 'select';
+				pointerMode = 'select';
 				break;
 			case 'rectangle':
 			case 'ellipse':
 			case 'segment':
+				bb = null;
+
+				results = [];
+
 				draw();
-				box.clear();
-				shape = create_shape(tool, orig_pointer.x, orig_pointer.y, 0, 0, base_options);
+
+				shape = create_shape(tool, mouse.x, mouse.y, 0, 0, default_options);
 
 				break;
 		}
@@ -131,58 +161,137 @@
 
 	function onpointermove(event: PointerEvent) {
 		requestAnimationFrame(() => {
-			const pointer = new Vector(
-				event.offsetX * devicePixelRatio,
-				event.offsetY * devicePixelRatio
+			const pos = new Vector(
+				Math.floor(event.offsetX * devicePixelRatio),
+				Math.floor(event.offsetY * devicePixelRatio)
 			);
-
-			const query_result: Shape[] = [];
 
 			switch (tool) {
 				case 'pointer':
-					switch (pointer_mode) {
+					switch (pointerMode) {
 						case 'select':
-							refresh();
-							box.clear();
-							const [dx, dy] = pointer.substract(orig_pointer);
-							const range = new AABB(orig_pointer.x, orig_pointer.y, dx, dy);
-							qtree.query_in_range(range, query_result);
-							query_result.forEach((result) => box.keep(result));
-							box.draw(rough);
+							results = [];
+
+							clean();
+
+							redraw();
+
+							const size = pos.substract(mouse);
+
+							const range = new AABB(mouse.x, mouse.y, size.x, size.y);
+
+							range.normalize();
+
+							qtree.query(
+								{
+									at: null,
+									range
+								},
+								results
+							);
+
+							bb = compute_bounding_box(results);
+							bb.draw(context, results.length > 1);
+							break;
+						case 'rotate':
+							if (!bb) return;
+
+							clean();
+
+							const cx = bb.x + bb.width / 2;
+							const cy = bb.y + bb.height / 2;
+
+							const prev = Math.atan2(mouse.y - cy, mouse.x - cx);
+							const cur = Math.atan2(pos.y - cy, pos.x - cx);
+							const angle = cur - prev;
+
+							mouse.set(pos.x, pos.y);
+
+							results.forEach((s) => {
+								s.rotate(angle);
+							});
+
+							redraw();
+
+							bb = compute_bounding_box(results);
+							bb?.draw(context, results.length > 1);
+
 							break;
 						case 'resize':
-							refresh();
-							box.resize(orig_pointer, pointer, anchor);
-							box.draw(rough);
+							clean();
+
+							const scalar = pos.substract(anchor).divide(mouse.substract(anchor));
+
+							for (const s of results) {
+								const [nw, se] = s.history;
+
+								const origin = nw.substract(anchor).multiply(scalar).sum(anchor);
+								const size = se.substract(nw).multiply(scalar);
+
+								switch (ptr_direction) {
+									case 'east':
+									case 'west':
+										s.move(origin.x, nw.y);
+										s.resize(size.x, se.substract(nw).y);
+										s.draw(context, rough);
+										break;
+								}
+
+								if (scalar.x < 0 || scalar.y < 0) s.normalize();
+							}
+
+							redraw();
+
+							bb = compute_bounding_box(results);
+							bb?.draw(context, results.length > 1);
 							break;
 						case 'move':
-							refresh();
-							box.move(pointer);
-							box.draw(rough);
+							clean();
+
+							results.forEach((s) => {
+								const dx = pos.x - s.offset.x;
+								const dy = pos.y - s.offset.y;
+
+								s.move(dx, dy);
+							});
+
+							redraw();
+
+							bb = compute_bounding_box(results);
+							bb?.draw(context, results.length > 1);
+
 							break;
 						default:
-							if (box.is_empty()) {
-								cursor = qtree.has(pointer) ? 'move' : 'default';
+							if (!bb) {
+								cursor = qtree.has(pos) ? 'move' : 'default';
 								return;
 							}
 
-							if (box.contains(pointer)) {
-								cursor = 'move';
-							} else {
-								cursor = CursorStylesVariants[box.find_pointer_side(pointer)];
+							if (bb?.intersects_pivot(pos)) {
+								cursor = 'grab';
+								return;
 							}
+
+							if (bb.contains(pos)) {
+								cursor = 'move';
+								return;
+							}
+
+							const ptr_dir = get_ptr_direction(pos, bb) || 'none';
+
+							cursor = CURSOR_STYLE_VARIANTS[ptr_dir];
 							break;
 					}
 				case 'rectangle':
 				case 'ellipse':
 				case 'segment':
 					if (shape) {
-						refresh();
-						const [a] = shape.points;
-						const [dx, dy] = pointer.substract(a);
-						shape.resize(dx, dy);
-						shape.draw(rough);
-						shapes.push(shape);
+						clean();
+						redraw();
+						const [nw] = shape.vertices;
+						const size = pos.substract(nw);
+						shape.resize(size.x, size.y);
+						shape.draw(context, rough);
 					}
 					break;
 			}
@@ -193,13 +302,20 @@
 		defer();
 
 		if (shape) {
-			refresh();
-			shape.draw(rough);
+			clean();
+			redraw();
+
 			shape.normalize();
+			shape.draw(context, rough);
+
+			bb = shape.AABB;
+			bb.draw(context);
+
 			shapes.push(shape);
+
 			qtree.insert(shape);
-			box.keep(shape);
-			box.draw(rough);
+
+			results = [shape];
 		}
 
 		cursor = 'default';
@@ -210,6 +326,7 @@
 	function config() {
 		context = canvas.getContext('2d') as CanvasRenderingContext2D;
 		rough = roughCanvas.canvas(canvas);
+
 		const rect = canvas.getBoundingClientRect();
 
 		context.scale(dpr, dpr);
@@ -231,6 +348,7 @@
 <canvas
 	bind:this={canvas}
 	width={window.innerWidth}
+	class="bg-[#1e1e1e]"
 	height={window.innerHeight}
 	class:cursor-move={cursor === 'move'}
 	class:cursor-crosshair={cursor === 'crosshair'}
@@ -239,6 +357,7 @@
 	class:cursor-nesw-resize={cursor === 'nesw-resize'}
 	class:cursor-ew-resize={cursor === 'ew-resize'}
 	class:cursor-ns-resize={cursor === 'ns-resize'}
+	class:cursor-grab={cursor === 'grab'}
 	{onpointerdown}
 	{onpointermove}
 	{onpointerup}

@@ -1,155 +1,209 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas';
-import type { Shape, ShapeOptions, Direction } from './types';
+import type { Shape, Direction, DrawOptions } from './types';
 import { Vector } from './math/vector';
-import { scale } from 'svelte/transition';
 
 const VERTICE_SIZE = 14;
 const BOX_MARGIN = 5;
 
 const EDGE_OPTIONS = {
-	stroke: 'rgba(137, 196, 244, 1)',
+	setAnchorPosstroke: 'rgba(137, 196, 244, 1)',
 	strokeWidth: 4,
 	roughness: 0,
 	fillStyle: 'solid',
 	fill: 'white'
 };
 
+/* TODO:
+ * We need to handle the bounding box directly
+ * on the shape itself and for multiple elements
+ * because when we rotate a shape, and select it again
+ * the bouding box must stay rotated(for single element)
+ * for multiple elements, it must not rotate(only the shapes must rotate)
+ * */
+
+type ResizeParams = {
+	ptr: Direction;
+	anchor: Vector;
+};
+
 export class BoundingBox {
-	x: number = $state(0);
-	y: number = $state(0);
-	width: number = $state(0);
-	height: number = $state(0);
+	private items: Shape[] = [];
 
-	private items: Shape[] = $state([]);
+	private vertices: Vector[] = [];
 
-	private dot: Vector = new Vector(0, 0);
+	private x: number = 0;
+	private y: number = 0;
+	private width: number = 0;
+	private height: number = 0;
 
-	public side: Direction | null = $state(null);
+	private options: DrawOptions = {
+		stroke: 'rgba(137, 196, 244, 1)',
+		strokeWidth: 4,
+		seed: 1,
+		roughness: 4
+	};
 
-	private snapshot: Map<Shape, Vector[]> = new Map();
+	add(...args: Shape[]) {
+		for (const arg of args) {
+			if (!Array.isArray(args)) {
+				this.items.push(arg);
+			}
+		}
 
-	private norwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-	private northeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-	private southwest: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-	private southeast: Vertice = $state(new Vertice(0, 0, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS));
-
-	private options: ShapeOptions;
-
-	constructor(options: ShapeOptions) {
-		this.options = options;
-	}
-
-	keep(item: Shape) {
-		this.items.push(item);
-		this.compute_dimensions();
+		this.compute();
 	}
 
 	clear() {
 		this.items = [];
-		this.compute_dimensions();
+		this.compute();
 	}
 
-	update_items_offset(v: Vector) {
-		for (let i = 0; i < this.items.length; i++) {
-			const item = this.items[i];
-			const [a] = item.points;
-			item.offset = v.substract(a);
+	setOffset(mouse: Vector) {
+		for (const item of this.items) {
+			const [topLeft] = item.points;
+			item.offset = mouse.substract(topLeft);
 		}
 	}
 
-	capture_snapshot() {
-		for (let i = 0; i < this.items.length; i++) {
-			const item = this.items[i];
-			this.snapshot.set(item, item.points);
+	setAnchorPos(x: number, y: number) {
+		const ptrDirection = this.getPtrDirection(x, y);
+
+		switch (ptrDirection) {
+			case 'east':
+				this.anchor.set(this.x, this.y);
+				break;
+			case 'west':
+				this.anchor.set(this.x + this.width, this.x);
+				break;
+			case 'south':
+				this.anchor.set(this.x, this.y);
+				break;
+			case 'north':
+				this.anchor.set(this.x, this.y + this.width);
+				break;
+			case 'south-east':
+				this.anchor.set(this.x, this.y);
+				break;
+			case 'south-west':
+				this.anchor.set(this.x + this.width, this.y);
+				break;
+			case 'nor-west':
+				this.anchor.set(this.x + this.width, this.y + this.width);
+				break;
+			case 'nor-east':
+				this.anchor.set(this.x, this.y + this.width);
+				break;
+		}
+
+		this.ptr_direction = ptrDirection;
+	}
+
+	save() {
+		for (const item of this.items) {
+			const points = item.vertices;
+			this.snapshot.set(item, [points[0], points[3]]);
 		}
 	}
 
-	contains(v: Vector): boolean {
+	contains(x: number, y: number): boolean {
 		return (
-			v.x > this.x + BOX_MARGIN &&
-			v.x < this.x + this.width - BOX_MARGIN &&
-			v.y > this.y + BOX_MARGIN &&
-			v.y < this.y + this.height - BOX_MARGIN
+			x > this.x + BOX_MARGIN &&
+			x < this.x + this.width - BOX_MARGIN &&
+			y > this.y + BOX_MARGIN &&
+			y < this.y + this.height - BOX_MARGIN
 		);
 	}
 
-	find_pointer_side(v: Vector): Direction {
-		if (this.northeast.intersects(v)) return 'nor-east';
-		if (this.southwest.intersects(v)) return 'south-west';
-		if (this.southeast.intersects(v)) return 'south-east';
-		if (this.norwest.intersects(v)) return 'nor-west';
+	getPtrDirection(x: number, y: number): Direction | null {
+		// if ((x > this.x - 5 && x < this.x - 5) || (y > this.y + 5 && y < this.y - 5)) return 'nor-east';
+
+		// if (this._northeast.intersects(x, y)) return 'nor-east';
+		// if (this._southwest.intersects(x, y)) return 'south-west';
+		// if (this._southeast.intersects(x, y)) return 'south-east';
+		// if (this._norwest.intersects(x, y)) return 'nor-west';
 
 		if (
-			v.x < this.x - BOX_MARGIN * 2 ||
-			v.x > this.x + this.width + BOX_MARGIN * 2 ||
-			v.y < this.y - BOX_MARGIN * 2 ||
-			v.y > this.y + this.height + BOX_MARGIN * 2
+			x < this.x - BOX_MARGIN * 2 ||
+			x > this.x + this.width + BOX_MARGIN * 2 ||
+			y < this.y - BOX_MARGIN * 2 ||
+			y > this.y + this.height + BOX_MARGIN * 2
 		)
-			return 'none';
+			return null;
 
-		const left_dist = Math.abs(v.x - this.x);
-		const right_dist = Math.abs(v.x - (this.x + this.width));
-		const top_dist = Math.abs(v.y - this.y);
-		const bottom_dist = Math.abs(v.y - (this.y + this.height));
+		const leftDist = Math.abs(x - this.x);
+		const rightDist = Math.abs(x - (this.x + this.width));
+		const topDist = Math.abs(y - this.y);
+		const bottomDist = Math.abs(y - (this.y + this.height));
 
-		const min_dist = Math.min(left_dist, right_dist, top_dist, bottom_dist);
+		const minDist = Math.min(leftDist, rightDist, topDist, bottomDist);
 
-		if (min_dist === left_dist) return 'west';
-		if (min_dist === right_dist) return 'east';
-		if (min_dist === top_dist) return 'north';
-		if (min_dist === bottom_dist) return 'south';
+		if (minDist === leftDist) return 'west';
+		if (minDist === rightDist) return 'east';
+		if (minDist === topDist) return 'north';
+		if (minDist === bottomDist) return 'south';
 
-		return 'none';
+		return null;
 	}
 
-	intersects(v: Vector): boolean {
+	intersects(x: number, y: number): boolean {
 		return !(
-			v.x < this.x - BOX_MARGIN * 2 ||
-			v.x > this.x + this.width + BOX_MARGIN * 2 ||
-			v.y < this.y - BOX_MARGIN * 2 ||
-			v.y > this.y + this.height + BOX_MARGIN * 2
+			x < this.x - BOX_MARGIN * 2 ||
+			x > this.x + this.width + BOX_MARGIN * 2 ||
+			y < this.y - BOX_MARGIN * 2 ||
+			y > this.y + this.height + BOX_MARGIN * 2
 		);
 	}
 
-	move(v: Vector) {
-		for (let i = 0; i < this.items.length; i++) {
-			const item = this.items[i];
-			const [dx, dy] = v.substract(item.offset);
-			item.move(dx, dy);
-		}
-
-		this.compute_dimensions();
+	intersectsPivot(x: number, y: number): boolean {
+		return !(
+			x < (this.x + this.width) / 2 ||
+			x > (this.x + this.width) / 2 ||
+			y < this.y - 40 ||
+			y > this.y + 40
+		);
 	}
 
-	resize(prev_mouse: Vector, mouse: Vector, anchor: Vector) {
-		const [sx, sy] = mouse.substract(anchor).divide(prev_mouse.substract(anchor));
+	move(x: number, y: number) {
+		for (const item of this.items) {
+			const movt = new Vector(x, y).substract(item.offset);
+			item.move(movt.x, movt.y);
+		}
+
+		this.compute();
+	}
+
+	resize(mouse_start: Vector, mouse: Vector) {
+		const sx = (mouse.x - this.anchor.x) / (mouse_start.x - this.anchor.x);
+		const sy = (mouse.y - this.anchor.y) / (mouse_start.y - this.anchor.y);
 
 		this.items.forEach((item) => {
-			const old_vecs = this.snapshot.get(item);
+			const initial_points = this.snapshot.get(item);
 
-			if (!old_vecs) return;
+			if (!initial_points) return;
 
-			const [a, , , d] = old_vecs;
+			const [start, end] = initial_points;
 
-			const [dx, dy] = a.substract(anchor).scale(sx, sy).sum(anchor);
-			const [width, height] = d.substract(a).scale(sx, sy);
+			const x = (start.x - this.anchor.x) * sx + this.anchor.x;
+			const y = (start.y - this.anchor.y) * sy + this.anchor.y;
+			const width = (end.x - start.x) * sx;
+			const height = (end.y - start.y) * sy;
 
-			switch (this.side) {
+			switch (this.ptr_direction) {
 				case 'east':
 				case 'west':
-					item.move(dx, a.y);
-					item.resize(width, d.substract(a).y);
+					item.move(x, start.y);
+					item.resize(width, end.y - start.y);
 					break;
 				case 'north':
 				case 'south':
-					item.move(a.x, dy);
-					item.resize(d.substract(a).x, height);
+					item.move(start.x, y);
+					item.resize(end.x - start.x, height);
 					break;
 				case 'nor-east':
 				case 'nor-west':
 				case 'south-east':
 				case 'south-west':
-					item.move(dx, dy);
+					item.move(x, y);
 					item.resize(width, height);
 					break;
 			}
@@ -157,104 +211,183 @@ export class BoundingBox {
 			if (sx < 0 || sy < 0) item.normalize();
 		});
 
-		this.compute_dimensions();
+		this.compute();
 	}
 
-	private compute_dimensions() {
-		let min_vec = new Vector(Infinity, Infinity);
-		let max_vec = new Vector(-Infinity, -Infinity);
+	rotate(x: number, y: number) {
+		const rad = x * (Math.PI / 180);
+		for (const item of this.items) {
+			item.rotate(rad);
+			item.normalize();
+		}
+
+		if (this.items.length > 1) this.compute();
+	}
+
+	private compute() {
+		let start = new Vector(Infinity, Infinity);
+		let end = new Vector(-Infinity, -Infinity);
 
 		this.items.forEach((item) => {
-			if (item.type === 'rectangle') {
-				const [a, , , d] = item.points;
+			item.vertices.forEach((v) => {
+				start = Vector.min(start, v);
+				end = Vector.max(end, v);
+			});
 
-				min_vec = min_vec.min(a);
-				max_vec = max_vec.max(d);
-			}
-
-			if (item.type === 'ellipse') {
-				const [a, , , d] = item.points;
-
-				min_vec = min_vec.min(a);
-				max_vec = max_vec.max(d);
-			}
+			// if (item.type === 'ellipse') {
+			// 	const [v1, , , v2] = item.points;
+			// 	start = Vector.min(start, v1);
+			// 	end = Vector.max(end, v2);
+			// }
 		});
 
-		this.x = min_vec.x;
-		this.y = min_vec.y;
-		this.width = max_vec.substract(min_vec).x;
-		this.height = max_vec.substract(min_vec).y;
+		this.x = start.x;
+		this.y = start.y;
 
-		this.norwest.move(this.x - VERTICE_SIZE / 2, this.y - VERTICE_SIZE / 2);
-		this.northeast.move(this.x + this.width - VERTICE_SIZE / 2, this.y - VERTICE_SIZE / 2);
-		this.southwest.move(this.x - VERTICE_SIZE / 2, this.y + this.height - VERTICE_SIZE / 2);
-		this.southeast.move(
-			this.x + this.width - VERTICE_SIZE / 2,
-			this.y + this.height - VERTICE_SIZE / 2
-		);
+		const [width, height] = end.substract(start);
 
-		if (this.items.length > 1) this.options.strokeLineDash = [5, 5];
-		else this.options.strokeLineDash = [0, 0];
+		this.width = width;
+		this.height = height;
+
+		this.vertices = [
+			[this.x - 5, this.y - 5],
+			[this.x - 5, this.y + this.height - 5],
+			[this.x + this.width - 5, this.y + this.height - 5],
+			[this.x + this.width - 5, this.y - 5]
+		];
 	}
 
-	draw(rough: RoughCanvas): void {
+	draw(rough: RoughCanvas, context: CanvasRenderingContext2D): void {
 		if (this.items.length === 0) return;
 
 		if (this.items.length > 1) this.options.strokeLineDash = [5, 5];
 		else this.options.strokeLineDash = [0, 0];
 
+		const [target] = this.items;
+
+		if (this.items.length === 1 && target.rotation !== 0) {
+			context.save();
+
+			context.translate(this.x + this.width / 2, this.y + this.height / 2);
+
+			context.rotate(target.rotation);
+
+			rough.rectangle(-this.width / 2, -this.height / 2, this.width, this.height, this.options);
+
+			const vertices = [
+				[-this.width / 2, -this.height / 2],
+				[-this.width / 2, this.height / 2],
+				[this.width / 2, this.height / 2],
+				[this.width / 2, -this.height / 2]
+			];
+
+			for (const [x, y] of vertices) {
+				rough.rectangle(x, y, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS);
+			}
+
+			rough.ellipse(-this.width, -this.height / 2 - 40, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS);
+
+			target.draw(rough);
+
+			context.restore();
+
+			return;
+		}
+
+		for (const target of this.items) {
+			target.draw(rough);
+		}
+
 		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
 
-		this.norwest.draw(rough);
-		this.northeast.draw(rough);
-		this.southwest.draw(rough);
-		this.southeast.draw(rough);
+		for (const [x, y] of this.vertices) {
+			rough.rectangle(x, y, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS);
+		}
+
+		rough.ellipse(this.x + this.width / 2, this.y - 40, VERTICE_SIZE, VERTICE_SIZE, EDGE_OPTIONS);
 	}
 
-	get points(): Vector[] {
-		return [
-			new Vector(this.x, this.y),
-			new Vector(this.x + this.width, this.y),
-			new Vector(this.x, this.y + this.height),
-			new Vector(this.x + this.width, this.y + this.height)
-		];
-	}
-
-	is_empty() {
+	empty() {
 		return this.items.length === 0;
 	}
 }
 
 class Vertice {
 	constructor(
-		public x: number,
-		public y: number,
-		public width: number,
-		public height: number,
-		public options: ShapeOptions
+		private _x: number,
+		private _y: number,
+		private _width: number,
+		private _height: number,
+		private _options: DrawOptions,
+		private _rotation: number = 0
 	) {}
 
 	move(x: number, y: number) {
-		this.x = x;
-		this.y = y;
+		this._x = x;
+		this._y = y;
 	}
 
-	draw(rough: RoughCanvas) {
-		rough.rectangle(this.x, this.y, this.width, this.height, this.options);
+	draw(rough: RoughCanvas, ctx: CanvasRenderingContext2D) {
+		if (this._rotation !== 0) {
+			ctx.save();
+			ctx.translate(this._x + this._width / 2, this._y + this._height / 2);
+
+			ctx.rotate(this._rotation);
+
+			rough.rectangle(
+				-this._width / 2,
+				-this._height / 2,
+				this._width,
+				this._height,
+				this._options
+			);
+
+			ctx.restore();
+			return;
+		}
+
+		rough.rectangle(this._x, this._y, this._width, this._height, this._options);
 	}
 
-	intersects(v: Vector): boolean {
+	rotate(deg: number) {
+		this._rotation = deg;
+	}
+
+	intersects(x: number, y: number): boolean {
 		return (
-			v.x >= this.x - 5 &&
-			v.x <= this.x + this.width + 5 &&
-			v.y >= this.y - 5 &&
-			v.y <= this.y + this.height + 5 &&
+			x >= this._x - 5 &&
+			x <= this._x + this._width + 5 &&
+			y >= this._y - 5 &&
+			y <= this._y + this._height + 5 &&
 			!(
-				v.x >= this.x + 5 &&
-				v.x <= this.x + this.width - 5 &&
-				v.x >= this.y + 5 &&
-				v.x <= this.y + this.height - 5
+				x >= this._x + 5 &&
+				x <= this._x + this._width - 5 &&
+				x >= this._y + 5 &&
+				x <= this._y + this._height - 5
 			)
 		);
+	}
+}
+
+class Pivot extends Vector {
+	private _gap: number = 40;
+	private _diameter: number = 16;
+	private _options: DrawOptions = {
+		...EDGE_OPTIONS,
+		roughness: 0,
+		strokeLineDash: [0, 0]
+	};
+
+	draw(rough: RoughCanvas, options: DrawOptions) {
+		rough.circle(this.x, this.y - this._gap, this._diameter, this._options);
+	}
+
+	intersects(x: number, y: number): boolean {
+		const r = this._diameter / 2;
+
+		const dx = x - this.x;
+		const dy = y - (this.y - this._gap);
+
+		return dx ** 2 + dy ** 2 <= r ** 2;
 	}
 }
