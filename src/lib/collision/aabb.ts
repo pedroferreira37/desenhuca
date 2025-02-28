@@ -9,6 +9,8 @@ export class AABB {
 		this.y = y;
 		this.width = width;
 		this.height = height;
+
+		this.normalize();
 	}
 
 	contains(x: number, y: number): boolean {

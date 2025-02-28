@@ -1,6 +1,5 @@
-import { rotate } from '$lib/util/util';
-import type { Vector } from '../math/vector';
-import type { Shape, SpacialSearchParmas } from '../types';
+import { Vector } from '../math/vector';
+import type { Shape } from '../types';
 import { AABB } from './aabb';
 
 export class QuadTree {
@@ -76,31 +75,38 @@ export class QuadTree {
 		return false;
 	}
 
-	query(search_params: SpacialSearchParmas, found: Shape[] = []): Shape[] {
-		const at = search_params.at;
-		const range = search_params.range;
+	query_in_range(range: AABB, found: Shape[]) {
+		if (!this.boundary.intersects(range)) return found;
 
-		if (!range && at) {
-			if (!this.boundary.contains(at.x, at.y)) return found;
-			for (const shape of this.shapes) {
-				if (shape.intersects(at)) found.push(shape);
-			}
-		}
+		for (const shape of this.shapes) {
+			const vertices = shape.vertices.map((vertice) =>
+				vertice.clone().rotate(shape.center.x, shape.center.y, -shape.angle)
+			);
 
-		if (range && !at) {
-			if (!this.boundary.intersects(range)) return found;
-			for (const s of this.shapes) {
-				const vertices = s.rotation !== 0 ? rotate(s.vertices, s.cx, s.cy, s.rotation) : s.vertices;
-
-				if (vertices.every((v) => range.contains(v.x, v.y))) found.push(s);
-			}
+			if (vertices.every((v) => range.contains(v.x, v.y))) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.query(search_params, found);
-			this.northeast!.query(search_params, found);
-			this.southwest!.query(search_params, found);
-			this.southeast!.query(search_params, found);
+			this.northwest!.query_in_range(range, found);
+			this.northeast!.query_in_range(range, found);
+			this.southwest!.query_in_range(range, found);
+			this.southeast!.query_in_range(range, found);
+		}
+
+		return found;
+	}
+
+	query_at(pos: Vector, found: Shape[]) {
+		if (!this.boundary.contains(pos.x, pos.y)) return found;
+		for (const shape of this.shapes) {
+			if (shape.intersects(pos)) found.push(shape);
+		}
+
+		if (this.divided) {
+			this.northwest!.query_at(pos, found);
+			this.northeast!.query_at(pos, found);
+			this.southwest!.query_at(pos, found);
+			this.southeast!.query_at(pos, found);
 		}
 
 		return found;
