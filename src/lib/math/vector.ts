@@ -1,52 +1,19 @@
 export class Vector {
-	constructor(
+	static from(x: number, y: number) {
+		return new Vector(x, y);
+	}
+
+	static zero() {
+		return new Vector(0, 0);
+	}
+
+	private constructor(
 		public x: number = 0,
 		public y: number = 0
 	) {}
 
-	substract(v: Vector) {
-		return new Vector(this.x - v.x, this.y - v.y);
-	}
-
-	divide(v: Vector | number) {
-		if (typeof v === 'number') {
-			return new Vector(this.x / v, this.y / v);
-		}
-		return new Vector(this.x / v.x, this.y / v.y);
-	}
-
-	sum(v: Vector) {
-		return new Vector(this.x + v.x, this.y + v.y);
-	}
-
-	multiply(v: Vector) {
-		return new Vector(this.x * v.x, this.y * v.y);
-	}
-
-	static min(...args: Vector[]) {
-		let min_x = args[0].x;
-		let min_y = args[0].y;
-
-		for (let i = 1; i < args.length; i++) {
-			const arg = args[i];
-			min_x = Math.min(min_x, arg.x);
-			min_y = Math.min(min_y, arg.y);
-		}
-
-		return new Vector(min_x, min_y);
-	}
-
-	static max(...args: Vector[]) {
-		let max_x = args[0].x;
-		let max_y = args[0].y;
-
-		for (let i = 1; i < args.length; i++) {
-			const arg = args[i];
-			max_x = Math.max(max_x, arg.x);
-			max_y = Math.max(max_y, arg.y);
-		}
-
-		return new Vector(max_x, max_y);
+	clone() {
+		return new Vector(this.x, this.y);
 	}
 
 	set(x: number, y: number) {
@@ -55,7 +22,46 @@ export class Vector {
 		return this;
 	}
 
-	[Symbol.iterator]() {
-		return [this.x, this.y][Symbol.iterator]();
+	substract(v: Vector) {
+		this.x -= v.x;
+		this.y -= v.y;
+		return this;
+	}
+
+	sum(v: Vector) {
+		this.x += v.x;
+		this.y += v.y;
+		return this;
+	}
+
+	divide(scalar: number) {
+		if (scalar !== 0) {
+			this.x /= scalar;
+			this.y /= scalar;
+		}
+
+		return this;
+	}
+
+	scale(scalar: number) {
+		this.x *= scalar;
+		this.y *= scalar;
+		return this;
+	}
+
+	dot(v: Vector) {
+		return this.x * v.x + this.y * v.y;
+	}
+
+	rotate(cx: number, cy: number, angle: number) {
+		const cos = Math.cos(angle);
+		const sin = Math.sin(angle);
+
+		const point = this.clone();
+
+		this.x = (point.x - cx) * cos - (point.y - cy) * sin + cx;
+		this.y = (point.x - cx) * sin + (point.y - cy) * cos + cy;
+
+		return this;
 	}
 }

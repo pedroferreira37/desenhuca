@@ -1,58 +1,47 @@
-import { BoundingBox } from '$lib/collision/bounding-box';
 import { Vector } from '$lib/math/vector';
-import type { DrawOptions, Shape } from '$lib/types';
-import { rotate } from '$lib/util/util';
+import type { Direction, DrawOptions, Shape } from '$lib/types';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 
-function uuid() {
-	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-		const random = (Math.random() * 16) | 0; // Generate a random number between 0 and 15
-		const value = char === 'x' ? random : (random & 0x3) | 0x8; // Set the high bits of `y` to `10`
-		return value.toString(16); // Convert to hexadecimal
-	});
-}
+const PADDING = 16;
 
-// Example usage:
 export class Rectangle implements Shape {
-	private _type: 'rectangle' = 'rectangle';
+	public id: string = crypto.randomUUID();
 
-	public offset: Vector = new Vector(0, 0);
+	public type: 'rectangle' = 'rectangle';
 
-	private _history: Vector[] = [];
+	public offset: Vector = Vector.zero();
+
+	public angle: number = 0;
+
+	public reference: Vector[] = [];
 
 	constructor(
-		private x: number,
-		private y: number,
+		private x: number = 0,
+		private y: number = 0,
 		private width: number,
 		private height: number,
-		private rotation: number = 0,
 		public options: DrawOptions
 	) {}
 
-	move(x: number, y: number): void {
-		this.x = x;
-		this.y = y;
+	move(v: Vector) {
+		this.x = v.x;
+		this.y = v.y;
+		return this;
 	}
 
-	get history(): Vector[] {
-		return this._history;
-	}
-
-	save() {
-		const [nw, , sw] = this.vertices;
-		this._history = [nw, sw];
-	}
-
-	update_offset(x: number, y: number) {
-		this.offset.set(x - this.x, y - this.y);
+	set_offset(v: Vector): this {
+		const offset = v.clone().substract(Vector.from(this.x, this.y));
+		this.offset.set(offset.x, offset.y);
+		return this;
 	}
 
 	normalize() {
-		const min = new Vector(
+		const min = Vector.from(
 			Math.min(this.x, this.x + this.width),
 			Math.min(this.y, this.y + this.height)
 		);
-		const max = new Vector(
+
+		const max = Vector.from(
 			Math.max(this.x, this.x + this.width),
 			Math.max(this.y, this.y + this.height)
 		);
@@ -64,98 +53,255 @@ export class Rectangle implements Shape {
 
 		this.width = size.x;
 		this.height = size.y;
+
+		return this;
 	}
 
-	resize(width: number, height: number): void {
+	resize(width: number, height: number) {
 		this.width = width;
 		this.height = height;
+		return this;
+	}
+
+	adjust(direction: Direction, mouse: Vector) {
+		const c = mouse.clone();
+
+		switch (direction) {
+			case 'south-west': {
+				const ne = Vector.from(this.x + this.width, this.y).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = ne.clone().sum(c).divide(2);
+
+				const new_ne = ne.rotate(center.x, center.y, -this.angle);
+
+				const sw = c.rotate(center.x, center.y, -this.angle);
+
+				this.x = sw.x;
+				this.y = new_ne.y;
+				this.width = new_ne.x - sw.x;
+				this.height = sw.y - new_ne.y;
+
+				break;
+			}
+
+			case 'south-east': {
+				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
+
+				const center = nw.clone().sum(mouse).divide(2);
+
+				const new_ne = nw.rotate(center.x, center.y, -this.angle);
+				const se = c.rotate(center.x, center.y, -this.angle);
+
+				this.x = new_ne.x;
+				this.y = new_ne.y;
+				this.width = se.x - new_ne.x;
+				this.height = se.y - new_ne.y;
+
+				break;
+			}
+
+			case 'nor-east': {
+				const sw = Vector.from(this.x, this.y + this.height).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = sw.clone().sum(mouse).divide(2);
+
+				const new_sw = sw.rotate(center.x, center.y, -this.angle);
+
+				const ne = c.rotate(center.x, center.y, -this.angle);
+
+				this.x = ne.x;
+				this.y = new_sw.y;
+				this.width = new_sw.x - ne.x;
+				this.height = ne.y - new_sw.y;
+
+				break;
+			}
+
+			case 'nor-west': {
+				const se = Vector.from(this.x + this.width, this.y + this.height).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = se.clone().sum(mouse).divide(2);
+
+				const new_se = se.rotate(center.x, center.y, -this.angle);
+				const ne = c.rotate(center.x, center.y, -this.angle);
+
+				this.x = ne.x;
+				this.y = ne.y;
+				this.width = new_se.x - ne.x;
+				this.height = new_se.y - ne.y;
+
+				break;
+			}
+
+			case 'east': {
+				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
+
+				const new_c = Vector.from(c.x, this.y + this.height).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = nw.clone().sum(new_c).divide(2);
+
+				const new_nw = nw.rotate(center.x, center.y, -this.angle);
+				const se = new_c.rotate(center.x, center.y, -this.angle);
+
+				this.x = new_nw.x;
+				this.y = new_nw.y;
+				this.width = se.x - nw.x;
+				this.height = se.y - nw.y;
+				break;
+			}
+
+			case 'south': {
+				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
+
+				const new_c = Vector.from(this.x + this.width, mouse.y).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = nw.clone().sum(new_c).divide(2);
+
+				const new_nw = nw.rotate(center.x, center.y, -this.angle);
+				const se = new_c.rotate(center.x, center.y, -this.angle);
+
+				this.x = new_nw.x;
+				this.y = se.y;
+				this.width = se.x - new_nw.x;
+				this.height = nw.y - se.y;
+				break;
+			}
+
+			case 'north': {
+				const sw = Vector.from(this.x, this.y + this.height).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const new_c = Vector.from(this.x + this.width, mouse.y).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = sw.clone().sum(new_c).divide(2);
+
+				const new_sw = sw.rotate(center.x, center.y, -this.angle);
+				const se = new_c.rotate(center.x, center.y, -this.angle);
+
+				this.x = new_sw.x;
+				this.y = se.y;
+				this.width = se.x - new_sw.x;
+				this.height = new_sw.y - se.y;
+
+				break;
+			}
+
+			case 'west': {
+				const ne = Vector.from(this.x + this.width, this.y).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const new_c = Vector.from(mouse.x, this.y + this.height).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
+
+				const center = ne.clone().sum(new_c).divide(2);
+
+				const new_ne = ne.rotate(center.x, center.y, -this.angle);
+				const sw = new_c.rotate(center.x, center.y, -this.angle);
+
+				this.x = new_ne.x;
+				this.y = new_ne.y;
+				this.width = sw.x - ne.x;
+				this.height = sw.y - ne.y;
+
+				break;
+			}
+		}
+
+		this.normalize();
+
+		return this;
 	}
 
 	rotate(angle: number) {
-		this.rotation += angle;
+		this.angle += angle;
+		return this;
+	}
+
+	get rotated(): boolean {
+		return this.angle !== 0;
 	}
 
 	draw(c: CanvasRenderingContext2D, r: RoughCanvas): void {
 		c.lineWidth = 8;
 
-		if (this.rotation !== 0) {
+		if (this.rotated) {
 			c.save();
-
-			c.translate(this.x + this.width / 2, this.y + this.height / 2);
-
-			c.rotate(this.rotation);
-
-			r.rectangle(-this.width / 2, -this.height / 2, this.width, this.height, this.options);
-
+			c.translate(this.center.x, this.center.y);
+			c.rotate(this.angle);
+			c.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height);
 			c.restore();
 			return;
 		}
 
-		r.rectangle(this.x, this.y, this.width, this.height, this.options);
+		c.strokeRect(this.x, this.y, this.width, this.height);
 	}
 
-	intersects(other: Vector): boolean {
-		const vpos = rotate([other], this.cx, this.cy, -this.rotation)[0];
-		/*
-		 * !(
-		 
-			x < this.x ||
-			x > this.x + this.width ||
-			y < this.y ||
-			y > this.y + this.height 
-
-			)
-		 *
-		 */
+	intersects(v: Vector): boolean {
+		const p = v.clone().rotate(this.center.x, this.center.y, -this.angle);
 
 		return (
-			vpos.x >= this.x - 10 &&
-			vpos.x <= this.x + this.width + 10 &&
-			vpos.y >= this.y - 10 &&
-			vpos.y <= this.y + this.height + 10 &&
-			(vpos.y < this.y ||
-				vpos.y > this.y + this.height ||
-				vpos.x < this.x ||
-				vpos.x > this.x + this.width)
+			p.x >= this.x - PADDING &&
+			p.x <= this.x + this.width + PADDING &&
+			p.y >= this.y - PADDING &&
+			p.y <= this.y + this.height + PADDING &&
+			(p.y < this.y + PADDING ||
+				p.y > this.y + this.height - PADDING ||
+				p.x < this.x + PADDING ||
+				p.x > this.x + this.width - PADDING)
 		);
 	}
 
-	contains(x: number, y: number): boolean {
-		return x >= this.x && x <= this.x + this.width && y >= this.y && y <= this.y + this.height;
+	contains(v: Vector): boolean {
+		const p = v.clone().rotate(this.center.x, this.center.y, -this.angle);
+
+		return (
+			p.x >= this.x && p.x <= this.x + this.width && p.y >= this.y && p.y <= this.y + this.height
+		);
 	}
 
-	get cx(): number {
-		return this.x + this.width / 2;
+	get center(): Vector {
+		return Vector.from(this.x + this.width / 2, this.y + this.height / 2);
 	}
-
-	get cy(): number {
-		return this.y + this.height / 2;
-	}
-
-	/**
-	 * Gets the points of the shape relative to its center.
-	 * The points are ordered as follows:
-	 * - Top-left
-	 * - Top-right
-	 * - Bottom-left
-	 * - Bottom-right
-	 *
-	 * @returns {Vector[]} An array of `Vector` objects representing the four corners of the rectangle.
-	 */
 
 	get vertices(): Vector[] {
-		const cx = this.x + this.width / 2;
-		const cy = this.y + this.height / 2;
-
 		return [
-			new Vector(this.x, this.y),
-			new Vector(this.x, this.y + this.height),
-			new Vector(this.x + this.width, this.y + this.height),
-			new Vector(this.x + this.width, this.y)
+			Vector.from(this.x, this.y),
+			Vector.from(this.x, this.y + this.height),
+			Vector.from(this.x + this.width, this.y + this.height),
+			Vector.from(this.x + this.width, this.y)
 		];
-	}
-
-	get AABB() {
-		return new BoundingBox(this.x - 4, this.y - 4, this.width + 8, this.height + 8, this.rotation);
 	}
 }

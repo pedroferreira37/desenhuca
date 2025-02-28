@@ -1,47 +1,32 @@
 import type { Options } from 'roughjs/bin/core';
 import { Vector } from './math/vector';
 import type { AABB } from './collision/aabb';
-import type { BoundingBox } from './collision/bounding-box';
+import type { Gizmo } from './collision/bounding-box';
+import type { RoughCanvas } from 'roughjs/bin/canvas';
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'segment';
 
 export interface Shape {
+	id: string;
 	type: ShapeType;
 	vertices: Vector[];
-	rotation: number;
+	reference: Vector[];
 	offset: Vector;
-	cx: number;
-	cy: number;
-	AABB: BoundingBox;
-	customize(options: Options): void;
-	move(x: number, y: number): void;
-	resize(width: number, height: number): void;
-	rotate(angle: number): void;
-	draw(context: CanvasRenderingContext2D): void;
-	intersects(pos: Vector): boolean;
-	contains(x: number, y: number): boolean;
-	normalize(): void;
+	angle: number;
+	center: Vector;
+	set_offset(v: Vector): this;
+	move(v: Vector): this;
+	intersects(v: Vector): boolean;
+	contains(v: Vector): boolean;
+	resize(width: number, height: number): this;
+	adjust(direction: Direction, mouse: Vector): this;
+	rotate(angle: number): this;
+	customize(options: Options): this;
+	draw(context: CanvasRenderingContext2D, rough: RoughCanvas): void;
+	normalize(): this;
 }
 
-export type SpacialSearchParmas =
-	| {
-			at: Vector;
-			range: null;
-	  }
-	| {
-			at: null;
-			range: AABB;
-	  };
-
-export type Cursor =
-	| 'default'
-	| 'crosshair'
-	| 'move'
-	| 'ew-resize'
-	| 'nwse-resize'
-	| 'nesw-resize'
-	| 'ns-resize'
-	| 'grab';
+export type Cursor = 'custom' | 'crosshair' | 'move' | 'ew' | 'nwse' | 'nesw' | 'ns' | 'grab';
 
 export type Direction =
 	| 'west'
@@ -51,8 +36,7 @@ export type Direction =
 	| 'south-west'
 	| 'south-east'
 	| 'nor-west'
-	| 'nor-east'
-	| 'none';
+	| 'nor-east';
 
 export type Tool = 'pointer' | 'pencil' | 'eraser' | 'rectangle' | 'ellipse' | 'segment';
 export type PointerMode = 'select' | 'move' | 'resize' | 'rotate' | 'idle';

@@ -7,16 +7,16 @@ import { Ellipse } from './shape/ellipse';
 import { Rectangle } from './shape/rectangle';
 
 export function create_shape(
-	type: ShapeType = 'rectangle',
+	type: ShapeType,
 	x: number,
 	y: number,
 	width: number,
 	height: number,
 	options: Options
-) {
+): Shape {
 	switch (type) {
 		case 'rectangle':
-			return new Rectangle(x, y, width, height, 0, options);
+			return new Rectangle(x, y, width, height, options);
 		case 'ellipse':
 			return new Ellipse(x, y, width, height, options);
 		default:
