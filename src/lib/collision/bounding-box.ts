@@ -250,42 +250,37 @@ export class Gizmo {
 				const factor_x = (mouse.x - this.anchor.x) / (last.x - this.anchor.x);
 				const factor_y = (mouse.y - this.anchor.y) / (last.y - this.anchor.y);
 
-				const scale = Math.max(factor_x, factor_y);
+				let scale = Math.max(factor_x, factor_y);
 
-				let x;
-				let y;
-				let width;
-				let height;
+				let x: number;
+				let y: number;
+				let width: number;
+				let height: number;
 
 				if (should_maintain_aspect_ration) {
 					if (direction === 'east' || direction === 'west') {
-						x = (nw.x - this.anchor.x) * factor_x + this.anchor.x;
-						y = (nw.y - this.anchor.y) * factor_x + this.anchor.y;
-						width = (se.x - nw.x) * factor_x;
-						height = (se.y - nw.y) * factor_x;
-					} else if (direction === 'north' || direction === 'south') {
-						x = (nw.x - this.anchor.x) * factor_y + this.anchor.x;
-						y = (nw.y - this.anchor.y) * factor_y + this.anchor.y;
-						width = (se.x - nw.x) * factor_y;
-						height = (se.y - nw.y) * factor_y;
-					} else {
-						x = (nw.x - this.anchor.x) * scale + this.anchor.x;
-						y = (nw.y - this.anchor.y) * scale + this.anchor.y;
-						width = (se.x - nw.x) * scale;
-						height = (se.y - nw.y) * scale;
+						scale = factor_x;
 					}
-				} else {
-					x = (nw.x - this.anchor.x) * factor_x + this.anchor.x;
-					y = (nw.y - this.anchor.y) * factor_y + this.anchor.y;
-					width = (se.x - nw.x) * factor_x;
-					height = (se.y - nw.y) * factor_y;
-				}
 
-				if (should_maintain_aspect_ration) {
+					if (direction === 'north' || direction === 'south') {
+						scale = factor_y;
+					}
+
+					x = (nw.x - this.anchor.x) * scale + this.anchor.x;
+					y = (nw.y - this.anchor.y) * scale + this.anchor.y;
+					width = (se.x - nw.x) * scale;
+					height = (se.y - nw.y) * scale;
+
 					target.move(Vector.from(x, y));
 					target.resize(width, height);
+
 					return;
 				}
+
+				x = (nw.x - this.anchor.x) * factor_x + this.anchor.x;
+				y = (nw.y - this.anchor.y) * factor_y + this.anchor.y;
+				width = (se.x - nw.x) * factor_x;
+				height = (se.y - nw.y) * factor_y;
 
 				switch (direction) {
 					case 'east':
@@ -361,9 +356,9 @@ export class Gizmo {
 
 		const side = this.find_handle_under_cursor(v);
 
-		const should_main_aspect_ration = this.targets.some((target) => target.angle !== 0);
+		const should_maintain_aspect_ration = this.targets.some((target) => target.angle !== 0);
 
-		if (!should_main_aspect_ration) {
+		if (!should_maintain_aspect_ration) {
 			switch (side) {
 				case 'east':
 					this.anchor.set(boundary.x, boundary.y);
