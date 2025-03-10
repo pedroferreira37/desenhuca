@@ -14,16 +14,16 @@ export interface Shape {
 	offset: Vector;
 	angle: number;
 	center: Vector;
-	set_offset(v: Vector): this;
-	move(v: Vector): this;
+	set_offset(v: Vector): void;
+	move(v: Vector): void;
 	intersects(v: Vector): boolean;
 	contains(v: Vector): boolean;
-	resize(width: number, height: number): this;
-	adjust(direction: Direction, mouse: Vector): this;
-	rotate(angle: number): this;
-	customize(options: Options): this;
+	resize(width: number, height: number): void;
+	adjust(direction: Direction, mouse: Vector): void;
+	rotate(angle: number): void;
+	customize(options: Options): void;
 	draw(context: CanvasRenderingContext2D, rough: RoughCanvas): void;
-	normalize(): this;
+	normalize(): void;
 }
 
 export type Cursor = 'custom' | 'crosshair' | 'move' | 'ew' | 'nwse' | 'nesw' | 'ns' | 'grab';

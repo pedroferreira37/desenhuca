@@ -1,5 +1,11 @@
 <script lang="ts">
 	import type { Tool } from '$lib/types';
+	import Ellipse from './svgs/Ellipse.svelte';
+	import Eraser from './svgs/Eraser.svelte';
+	import Pencil from './svgs/Pencil.svelte';
+	import Pointer from './svgs/Pointer.svelte';
+	import Rectangle from './svgs/Rectangle.svelte';
+	import Segment from './svgs/Segment.svelte';
 
 	type Props = {
 		selected: Tool;
@@ -17,39 +23,18 @@
 		class="rounded-lg hover:bg-zinc-200 transition-all"
 		class:bg-zinc-200={selected === 'pointer'}
 	>
-		<button onclick={() => pointer()} aria-label="move" class="block p-2">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="stroke-stone-700 w-4 h-4"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z" /></svg
-			>
+		<button
+			onclick={() => pointer()}
+			aria-label="move"
+			class="p-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-stone-700"
+		>
+			<Pointer />
 		</button>
 	</li>
 
 	<li class:bg-zinc-200={selected === 'pencil'} class="rounded-lg hover:bg-zinc-200 transition-all">
-		<button aria-label="pencil" class="p-2 block">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="stroke-stone-700 w-4 h-4"
-				><path
-					d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
-				/></svg
-			>
+		<button aria-label="pencil" class="p-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-stone-700">
+			<Pencil />
 		</button>
 	</li>
 
@@ -57,19 +42,12 @@
 		class:bg-zinc-200={selected === 'rectangle'}
 		class="rounded-lg hover:bg-zinc-200 transition-all"
 	>
-		<button class="p-2" aria-label="rectangle" onmousedown={() => rectangle()}>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="stroke-stone-700 w-4 h-4"><rect width="18" height="18" x="3" y="3" rx="2" /></svg
-			>
+		<button
+			class="p-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-stone-700"
+			aria-label="rectangle"
+			onmousedown={() => rectangle()}
+		>
+			<Rectangle />
 		</button>
 	</li>
 
@@ -77,19 +55,12 @@
 		class:bg-zinc-200={selected === 'ellipse'}
 		class="rounded-lg hover:bg-zinc-200 transition-all"
 	>
-		<button class="p-2" aria-label="ellipse" onmousedown={() => ellipse()}>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="stroke-stone-700 w-4 h-4"><circle cx="12" cy="12" r="10" /></svg
-			>
+		<button
+			class="p-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-stone-700"
+			aria-label="ellipse"
+			onmousedown={() => ellipse()}
+		>
+			<Ellipse />
 		</button>
 	</li>
 
@@ -97,19 +68,22 @@
 		class:bg-zinc-200={selected === 'segment'}
 		class="rounded-lg hover:bg-zinc-200 transition-all"
 	>
-		<button class="p-2" aria-label="line" onmousedown={() => line()}>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="24"
-				height="24"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="stroke-stone-700 w-4 h-4"><path d="M5 12h14" /></svg
-			>
+		<button
+			class="p-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-stone-700"
+			aria-label="line"
+			onmousedown={() => line()}
+		>
+			<Segment />
+		</button>
+	</li>
+
+	<li class:bg-zinc-200={selected === 'eraser'} class="rounded-lg hover:bg-zinc-200 transition-all">
+		<button
+			class="p-2 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:stroke-stone-700"
+			aria-label="line"
+			onmousedown={() => line()}
+		>
+			<Eraser />
 		</button>
 	</li>
 	<ul class="border-l border-stone-300 block text-stone-700 pl-4 pr-3">

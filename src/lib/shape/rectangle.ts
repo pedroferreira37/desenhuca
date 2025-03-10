@@ -26,13 +26,11 @@ export class Rectangle implements Shape {
 	move(v: Vector) {
 		this.x = v.x;
 		this.y = v.y;
-		return this;
 	}
 
-	set_offset(v: Vector): this {
+	set_offset(v: Vector) {
 		const offset = v.clone().substract(Vector.from(this.x, this.y));
 		this.offset.set(offset.x, offset.y);
-		return this;
 	}
 
 	normalize() {
@@ -53,14 +51,11 @@ export class Rectangle implements Shape {
 
 		this.width = size.x;
 		this.height = size.y;
-
-		return this;
 	}
 
 	resize(width: number, height: number) {
 		this.width = width;
 		this.height = height;
-		return this;
 	}
 
 	adjust(direction: Direction, mouse: Vector) {
@@ -117,10 +112,10 @@ export class Rectangle implements Shape {
 
 				const ne = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = ne.x;
-				this.y = new_sw.y;
-				this.width = new_sw.x - ne.x;
-				this.height = ne.y - new_sw.y;
+				this.x = new_sw.x;
+				this.y = ne.y;
+				this.width = ne.x - new_sw.x;
+				this.height = new_sw.y - ne.y;
 
 				break;
 			}
@@ -239,34 +234,27 @@ export class Rectangle implements Shape {
 				break;
 			}
 		}
-
-		this.normalize();
-
-		return this;
 	}
 
 	rotate(angle: number) {
 		this.angle += angle;
-		return this;
 	}
 
 	get rotated(): boolean {
 		return this.angle !== 0;
 	}
 
-	draw(c: CanvasRenderingContext2D, r: RoughCanvas): void {
-		c.lineWidth = 8;
-
+	draw(c: CanvasRenderingContext2D, r: RoughCanvas) {
 		if (this.rotated) {
 			c.save();
 			c.translate(this.center.x, this.center.y);
 			c.rotate(this.angle);
-			c.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height);
+			r.rectangle(-this.width / 2, -this.height / 2, this.width, this.height, this.options);
 			c.restore();
 			return;
 		}
 
-		c.strokeRect(this.x, this.y, this.width, this.height);
+		r.rectangle(this.x, this.y, this.width, this.height, this.options);
 	}
 
 	intersects(v: Vector): boolean {
