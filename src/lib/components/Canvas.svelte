@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { Vector } from '$lib/math/vector';
 	import { QuadTree } from '$lib/collision/qtree';
-	import { Gizmo } from '$lib/collision/bounding-box';
+	import { Gizmo } from '$lib/collision/gizmo';
 	import { AABB } from '$lib/collision/aabb';
 	import type { Shape, Tool, Cursor, PointerMode, Direction } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { Options } from 'roughjs/bin/core';
-	import { create_shape } from '$lib/shape';
-	import { Rectangle } from '$lib/shape/rectangle';
+	import create from '$lib/shape-factory';
 
 	const directions: Record<Direction, Cursor> = {
 		west: 'ew',
@@ -77,8 +76,8 @@
 
 	let default_options = $state<Options>({
 		seed: 2,
-		roughness: 4,
-		strokeWidth: 4
+		strokeWidth: 8,
+		roughness: 4
 	});
 
 	function clear() {
@@ -94,23 +93,6 @@
 
 		switch (tool) {
 			case 'pointer':
-				select();
-
-				if (gizmo.empty) {
-					const found: Shape[] = [];
-
-					qtree.query_at(last, found);
-
-					if (found.length) {
-						gizmo.attach(found).draw(context);
-					}
-
-					cursor = 'custom';
-					mode = 'select';
-
-					return;
-				}
-
 				if (gizmo.contains(last)) {
 					gizmo.offset(last);
 					drag();
@@ -130,8 +112,24 @@
 
 				gizmo.clear();
 
+				select();
 				clear();
 				redraw();
+
+				const found: Shape[] = [];
+
+				qtree.query_at(last, found);
+
+				if (found.length) {
+					gizmo.attach(found);
+					gizmo.draw(context);
+					gizmo.offset(last);
+					drag();
+					return;
+				}
+
+				cursor = 'custom';
+				mode = 'select';
 
 				break;
 			case 'rectangle':
@@ -141,7 +139,7 @@
 
 				draw();
 
-				shape = create_shape(tool, last.x, last.y, 0, 0, default_options);
+				shape = create(tool, last.x, last.y, 0, 0, default_options);
 
 				break;
 		}
@@ -168,7 +166,8 @@
 
 							if (!found.length) return;
 
-							gizmo.attach(found).draw(context);
+							gizmo.attach(found);
+							gizmo.draw(context);
 
 							break;
 						case 'rotate':
@@ -187,7 +186,8 @@
 
 							last.set(mouse.x, mouse.y);
 
-							gizmo.rotate(angle).draw(context);
+							gizmo.rotate(angle);
+							gizmo.draw(context);
 
 							redraw();
 							break;
@@ -196,7 +196,8 @@
 
 							if (!ptr_direction) return;
 
-							gizmo.adjust(ptr_direction, last, mouse).draw(context);
+							gizmo.adjust(ptr_direction, last, mouse);
+							gizmo.draw(context);
 
 							redraw();
 
@@ -204,15 +205,13 @@
 						case 'move':
 							clear();
 
-							gizmo.move(mouse.clone()).draw(context);
+							gizmo.move(mouse.clone());
+							gizmo.draw(context);
 
 							redraw();
 							break;
 						default:
-							if (gizmo.empty) {
-								cursor = qtree.has(mouse) ? 'move' : 'custom';
-								return;
-							}
+							cursor = qtree.has(mouse) ? 'move' : 'custom';
 
 							ptr_direction = gizmo.find_handle_under_cursor(mouse);
 
@@ -231,7 +230,6 @@
 								return;
 							}
 
-							cursor = 'custom';
 							break;
 					}
 				case 'rectangle':
@@ -242,9 +240,11 @@
 					clear();
 					redraw();
 
-					const size = mouse.clone().substract(shape.vertices[0]);
+					const [nw] = shape.vertices;
+					const size = mouse.clone().substract(nw);
 
-					shape.resize(size.x, size.y).draw(context, rough);
+					shape.resize(size.x, size.y);
+					shape.draw(context, rough);
 
 					break;
 			}
@@ -256,18 +256,22 @@
 
 		cursor = 'custom';
 
+		gizmo.normalize();
+
 		if (!shape) return;
 
 		clear();
 		redraw();
 
-		shape.normalize().draw(context, rough);
+		shape.normalize();
+		shape.draw(context, rough);
 
 		shapes.push(shape);
 
 		qtree.insert(shape);
 
-		gizmo.attach([shape]).draw(context);
+		gizmo.attach([shape]);
+		gizmo.draw(context);
 
 		shape = null;
 	}

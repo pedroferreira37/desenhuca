@@ -1,19 +1,16 @@
-import type { RoughCanvas } from 'roughjs/bin/canvas';
-import { type DrawOptions, type Shape, type ShapeType } from './types';
-
-import type { Options } from 'roughjs/bin/core';
-import { Vector } from './math/vector';
+import type { DrawOptions, Shape, ShapeType } from './types';
 import { Ellipse } from './shape/ellipse';
 import { Rectangle } from './shape/rectangle';
 
-export function create_shape(
+export default function create(
 	type: ShapeType,
 	x: number,
 	y: number,
 	width: number,
 	height: number,
-	options: Options
+	options: DrawOptions
 ): Shape {
+	console.log(options);
 	switch (type) {
 		case 'rectangle':
 			return new Rectangle(x, y, width, height, options);

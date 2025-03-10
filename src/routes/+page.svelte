@@ -4,8 +4,7 @@
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { Vector } from '$lib/math/vector';
 	import type { Tool, Cursor, PointerMode as Mode } from '$lib/types';
-
-	const shortcuts: Tool[] = ['pointer', 'pencil', 'rectangle', 'ellipse', 'segment', 'eraser'];
+	import { get_tool_by_shortcut } from '$lib/util/util';
 
 	let tool = $state<Tool>('pointer');
 	let mode = $state<Mode>('idle');
@@ -91,10 +90,10 @@
 
 <svelte:window
 	onpointerdown={(event: PointerEvent) => {
-		last = { x: event.offsetX, y: event.offsetY };
+		last = { x: event.offsetX, y: event.offsetY }
 	}}
 	onpointermove={(event: PointerEvent) => {
-		mouse = { x: event.offsetX, y: event.offsetY };
+		mouse = { x: event.offsetX, y: event.offsetY }
 	}}
 	onmouseup={() => {
 		selecting = false;
@@ -102,9 +101,7 @@
 	onkeydown={(event) => {
 		const key = event.key;
 
-		if (!/^\d$/.test(event.key)) return;
-
-		tool = shortcuts[+key - 1] ?? 'pointer';
+		tool = get_tool_by_shortcut(key);
 
 		if (tool === 'pointer') {
 			cursor = 'custom';
@@ -115,5 +112,7 @@
 			cursor = 'crosshair';
 			return;
 		}
+
+		cursor = 'custom';
 	}}
 />
