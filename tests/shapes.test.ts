@@ -90,8 +90,8 @@ it('scales dimensions correctly with factor (2, 2) and origin anchor', () => {
 });
 
 it('scales dimensions correctly with different x and y factors', () => {
-	const topLeft = Vector.from(10, 10);
-	const bottomRight = Vector.from(30, 30);
+	const top_left = Vector.from(10, 10);
+	const bottom_right = Vector.from(30, 30);
 	const anchor = Vector.from(0, 0);
 	const factor = Vector.from(2, 0.5);
 
@@ -102,7 +102,7 @@ it('scales dimensions correctly with different x and y factors', () => {
 		height: 10
 	};
 
-	const actual = calculate_scaled_dimensions(topLeft, bottomRight, anchor, factor);
+	const actual = calculate_scaled_dimensions(top_left, bottom_right, anchor, factor);
 
 	expect(actual.x).toBe(expected.x);
 	expect(actual.y).toBe(expected.y);
@@ -111,8 +111,8 @@ it('scales dimensions correctly with different x and y factors', () => {
 });
 
 it('handles negative scale factors', () => {
-	const topLeft = Vector.from(10, 10);
-	const bottomRight = Vector.from(30, 30);
+	const top_left = Vector.from(10, 10);
+	const bottom_right = Vector.from(30, 30);
 	const anchor = Vector.from(0, 0);
 	const factor = Vector.from(-1, -1);
 
@@ -123,7 +123,7 @@ it('handles negative scale factors', () => {
 		height: -20
 	};
 
-	const actual = calculate_scaled_dimensions(topLeft, bottomRight, anchor, factor);
+	const actual = calculate_scaled_dimensions(top_left, bottom_right, anchor, factor);
 
 	expect(actual.x).toBe(expected.x);
 	expect(actual.y).toBe(expected.y);
