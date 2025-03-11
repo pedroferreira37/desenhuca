@@ -44,7 +44,7 @@ export class BoundingBox {
 
 		const size = max.substract(min);
 
-		this.center.set((min.x + size.x) / 2, (min.y + size.y) / 2);
+		this.center.set(min.x + size.x / 2, min.y + size.y / 2);
 
 		this.width = size.x;
 		this.height = size.y;

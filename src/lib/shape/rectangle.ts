@@ -5,8 +5,6 @@ import type { RoughCanvas } from 'roughjs/bin/canvas';
 const PADDING = 16;
 
 export class Rectangle implements Shape {
-	public id: string = crypto.randomUUID();
-
 	public type: 'rectangle' = 'rectangle';
 
 	public offset: Vector = Vector.zero();
@@ -33,24 +31,31 @@ export class Rectangle implements Shape {
 		this.offset.set(offset.x, offset.y);
 	}
 
-	normalize() {
-		const min = Vector.from(
-			Math.min(this.x, this.x + this.width),
-			Math.min(this.y, this.y + this.height)
+	rotate(angle: number) {
+		this.angle += angle;
+	}
+
+	intersects(v: Vector): boolean {
+		const p = v.clone().rotate(this.center.x, this.center.y, -this.angle);
+
+		return (
+			p.x >= this.x - PADDING &&
+			p.x <= this.x + this.width + PADDING &&
+			p.y >= this.y - PADDING &&
+			p.y <= this.y + this.height + PADDING &&
+			(p.y < this.y + PADDING ||
+				p.y > this.y + this.height - PADDING ||
+				p.x < this.x + PADDING ||
+				p.x > this.x + this.width - PADDING)
 		);
+	}
 
-		const max = Vector.from(
-			Math.max(this.x, this.x + this.width),
-			Math.max(this.y, this.y + this.height)
+	contains(v: Vector): boolean {
+		const p = v.clone().rotate(this.center.x, this.center.y, -this.angle);
+
+		return (
+			p.x >= this.x && p.x <= this.x + this.width && p.y >= this.y && p.y <= this.y + this.height
 		);
-
-		this.x = min.x;
-		this.y = min.y;
-
-		const size = max.substract(min);
-
-		this.width = size.x;
-		this.height = size.y;
 	}
 
 	resize(width: number, height: number) {
@@ -248,12 +253,24 @@ export class Rectangle implements Shape {
 		}
 	}
 
-	rotate(angle: number) {
-		this.angle += angle;
-	}
+	normalize() {
+		const min = Vector.from(
+			Math.min(this.x, this.x + this.width),
+			Math.min(this.y, this.y + this.height)
+		);
 
-	get rotated(): boolean {
-		return this.angle !== 0;
+		const max = Vector.from(
+			Math.max(this.x, this.x + this.width),
+			Math.max(this.y, this.y + this.height)
+		);
+
+		this.x = min.x;
+		this.y = min.y;
+
+		const size = max.substract(min);
+
+		this.width = size.x;
+		this.height = size.y;
 	}
 
 	draw(c: CanvasRenderingContext2D, r: RoughCanvas) {
@@ -271,33 +288,6 @@ export class Rectangle implements Shape {
 		c.restore();
 	}
 
-	intersects(v: Vector): boolean {
-		const p = v.clone().rotate(this.center.x, this.center.y, -this.angle);
-
-		return (
-			p.x >= this.x - PADDING &&
-			p.x <= this.x + this.width + PADDING &&
-			p.y >= this.y - PADDING &&
-			p.y <= this.y + this.height + PADDING &&
-			(p.y < this.y + PADDING ||
-				p.y > this.y + this.height - PADDING ||
-				p.x < this.x + PADDING ||
-				p.x > this.x + this.width - PADDING)
-		);
-	}
-
-	contains(v: Vector): boolean {
-		const p = v.clone().rotate(this.center.x, this.center.y, -this.angle);
-
-		return (
-			p.x >= this.x && p.x <= this.x + this.width && p.y >= this.y && p.y <= this.y + this.height
-		);
-	}
-
-	get center(): Vector {
-		return Vector.from(this.x + this.width / 2, this.y + this.height / 2);
-	}
-
 	get vertices(): Vector[] {
 		return [
 			Vector.from(this.x, this.y),
@@ -305,5 +295,13 @@ export class Rectangle implements Shape {
 			Vector.from(this.x + this.width, this.y + this.height),
 			Vector.from(this.x + this.width, this.y)
 		];
+	}
+
+	get center(): Vector {
+		return Vector.from(this.x + this.width / 2, this.y + this.height / 2);
+	}
+
+	get rotated(): boolean {
+		return this.angle !== 0;
 	}
 }

@@ -101,7 +101,7 @@
 	onkeydown={(event) => {
 		const key = event.key;
 
-		tool = get_tool_by_shortcut(key);
+		tool = get_tool_by_shortcut(key) ?? tool;
 
 		if (tool === 'pointer') {
 			cursor = 'custom';

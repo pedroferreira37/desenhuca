@@ -135,7 +135,10 @@ it('scaled resizing is returning the correct dimensions', () => {
 	const scale = Vector.from(2, 2);
 	const anchor = Vector.from(0, 0);
 
-	const tests = [[create('rectangle', 0, 0, 50, 50, {}), create('rectangle', 0, 0, 100, 100, {})]];
+	const tests = [
+		[create('rectangle', 0, 0, 50, 50, {}), create('rectangle', 0, 0, 100, 100, {})],
+		[create('ellipse', 0, 0, 50, 50, {}), create('ellipse', 0, 0, 100, 100, {})]
+	];
 
 	tests.forEach(([actual]) => {
 		actual.reference = [actual.vertices[0], actual.vertices[1]];

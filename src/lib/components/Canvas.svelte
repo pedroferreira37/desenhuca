@@ -75,9 +75,9 @@
 	let ptr_direction: Direction | null = null;
 
 	let default_options = $state<Options>({
-		seed: 2,
+		seed: 4,
 		strokeWidth: 8,
-		roughness: 4
+		roughness: 1
 	});
 
 	function clear(c: CanvasRenderingContext2D) {
@@ -91,7 +91,10 @@
 	function render_scene(c: CanvasRenderingContext2D, r: RoughCanvas, gizmo: Gizmo) {
 		clear(c);
 		redraw(c, r);
-		gizmo.draw(c);
+
+		if (!gizmo.empty) {
+			gizmo.draw(c);
+		}
 	}
 
 	function onpointerdown(event: PointerEvent) {
@@ -166,6 +169,8 @@
 							const range = new AABB(last.x, last.y, size.x, size.y);
 
 							qtree.query_in_range(range, found);
+
+							console.log(found);
 
 							if (!found.length) return;
 
