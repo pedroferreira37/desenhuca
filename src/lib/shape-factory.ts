@@ -10,7 +10,6 @@ export default function create(
 	height: number,
 	options: DrawOptions
 ): Shape {
-	console.log(options);
 	switch (type) {
 		case 'rectangle':
 			return new Rectangle(x, y, width, height, options);
