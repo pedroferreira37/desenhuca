@@ -58,7 +58,7 @@
 	}: Props = $props();
 
 	let canvas: HTMLCanvasElement;
-	let context: CanvasRenderingContext2D;
+	let ctx: CanvasRenderingContext2D;
 	let rough: RoughCanvas;
 	let qtree: QuadTree;
 
@@ -80,12 +80,18 @@
 		roughness: 4
 	});
 
-	function clear() {
-		context.clearRect(0, 0, canvas.width, canvas.height);
+	function clear(c: CanvasRenderingContext2D) {
+		c.clearRect(0, 0, canvas.width, canvas.height);
 	}
 
-	function redraw() {
-		shapes.forEach((shape) => shape.draw(context, rough));
+	function redraw(c: CanvasRenderingContext2D, r: RoughCanvas) {
+		shapes.forEach((shape) => shape.draw(c, r));
+	}
+
+	function render_scene(c: CanvasRenderingContext2D, r: RoughCanvas, gizmo: Gizmo) {
+		clear(c);
+		redraw(c, r);
+		gizmo.draw(c);
 	}
 
 	function onpointerdown(event: PointerEvent) {
@@ -113,8 +119,8 @@
 				gizmo.clear();
 
 				select();
-				clear();
-				redraw();
+
+				render_scene(ctx, rough, gizmo);
 
 				const found: Shape[] = [];
 
@@ -122,7 +128,7 @@
 
 				if (found.length) {
 					gizmo.attach(found);
-					gizmo.draw(context);
+					gizmo.draw(ctx);
 					gizmo.offset(last);
 					drag();
 					return;
@@ -155,9 +161,6 @@
 						case 'select':
 							const found: Shape[] = [];
 
-							clear();
-							redraw();
-
 							const size = mouse.clone().substract(last);
 
 							const range = new AABB(last.x, last.y, size.x, size.y);
@@ -167,12 +170,9 @@
 							if (!found.length) return;
 
 							gizmo.attach(found);
-							gizmo.draw(context);
 
 							break;
 						case 'rotate':
-							clear();
-
 							const center = gizmo.center;
 
 							const offset_from_origin = last.clone().substract(center);
@@ -187,28 +187,17 @@
 							last.set(mouse.x, mouse.y);
 
 							gizmo.rotate(angle);
-							gizmo.draw(context);
 
-							redraw();
 							break;
 						case 'resize':
-							clear();
-
 							if (!ptr_direction) return;
 
 							gizmo.adjust(ptr_direction, last, mouse);
-							gizmo.draw(context);
-
-							redraw();
 
 							break;
 						case 'move':
-							clear();
-
 							gizmo.move(mouse.clone());
-							gizmo.draw(context);
 
-							redraw();
 							break;
 						default:
 							cursor = qtree.has(mouse) ? 'move' : 'custom';
@@ -237,18 +226,17 @@
 				case 'segment':
 					if (!shape) return;
 
-					clear();
-					redraw();
-
 					const [nw] = shape.vertices;
 					const size = mouse.clone().substract(nw);
 
 					shape.resize(size.x, size.y);
-					shape.draw(context, rough);
+					shape.draw(ctx, rough);
 
 					break;
 			}
 		});
+
+		render_scene(ctx, rough, gizmo);
 	}
 
 	function onpointerup() {
@@ -260,18 +248,16 @@
 
 		if (!shape) return;
 
-		clear();
-		redraw();
-
 		shape.normalize();
-		shape.draw(context, rough);
+		shape.draw(ctx, rough);
 
 		shapes.push(shape);
 
 		qtree.insert(shape);
 
 		gizmo.attach([shape]);
-		gizmo.draw(context);
+
+		render_scene(ctx, rough, gizmo);
 
 		shape = null;
 	}
@@ -279,7 +265,7 @@
 	function crispify() {
 		const rect = canvas.getBoundingClientRect();
 
-		context.scale(dpr, dpr);
+		ctx.scale(dpr, dpr);
 
 		canvas.width = rect.width * dpr;
 		canvas.height = rect.height * dpr;
@@ -290,13 +276,13 @@
 
 	function window_resize() {
 		crispify();
-		redraw();
+		redraw(ctx, rough);
 
-		gizmo.draw(context);
+		gizmo.draw(ctx);
 	}
 
 	function config() {
-		context = canvas.getContext('2d') as CanvasRenderingContext2D;
+		ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 		rough = roughCanvas.canvas(canvas);
 
 		crispify();

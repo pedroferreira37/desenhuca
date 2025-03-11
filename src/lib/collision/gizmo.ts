@@ -312,7 +312,9 @@ export class Gizmo {
 	}
 
 	draw(c: CanvasRenderingContext2D) {
+		c.save();
 		this.boundary.draw(c, this.angle, this.targets.length > 1);
+		c.restore();
 	}
 
 	get empty(): boolean {

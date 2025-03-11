@@ -266,7 +266,9 @@ export class Rectangle implements Shape {
 			return;
 		}
 
+		c.save();
 		r.rectangle(this.x, this.y, this.width, this.height, this.options);
+		c.restore();
 	}
 
 	intersects(v: Vector): boolean {
