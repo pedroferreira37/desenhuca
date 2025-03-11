@@ -63,173 +63,185 @@ export class Rectangle implements Shape {
 
 		switch (direction) {
 			case 'south-west': {
-				const ne = Vector.from(this.x + this.width, this.y).rotate(
+				const top_right = Vector.from(this.x + this.width, this.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = ne.clone().sum(c).divide(2);
+				const center = top_right.clone().sum(c).divide(2);
 
-				const new_ne = ne.rotate(center.x, center.y, -this.angle);
+				const adjusted_top_right = top_right.rotate(center.x, center.y, -this.angle);
 
-				const sw = c.rotate(center.x, center.y, -this.angle);
+				const bottom_left = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = sw.x;
-				this.y = new_ne.y;
-				this.width = new_ne.x - sw.x;
-				this.height = sw.y - new_ne.y;
+				this.x = bottom_left.x;
+				this.y = adjusted_top_right.y;
+				this.width = adjusted_top_right.x - bottom_left.x;
+				this.height = bottom_left.y - adjusted_top_right.y;
 
 				break;
 			}
 
 			case 'south-east': {
-				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
+				const top_left = Vector.from(this.x, this.y).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
 
-				const center = nw.clone().sum(mouse).divide(2);
+				const center = top_left.clone().sum(mouse).divide(2);
 
-				const new_ne = nw.rotate(center.x, center.y, -this.angle);
-				const se = c.rotate(center.x, center.y, -this.angle);
+				const adjusted_top_left = top_left.rotate(center.x, center.y, -this.angle);
+				const bottom_right = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = new_ne.x;
-				this.y = new_ne.y;
-				this.width = se.x - new_ne.x;
-				this.height = se.y - new_ne.y;
+				this.x = adjusted_top_left.x;
+				this.y = adjusted_top_left.y;
+				this.width = bottom_right.x - adjusted_top_left.x;
+				this.height = bottom_right.y - adjusted_top_left.y;
 
 				break;
 			}
 
 			case 'nor-east': {
-				const sw = Vector.from(this.x, this.y + this.height).rotate(
+				const bottom_left = Vector.from(this.x, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = sw.clone().sum(mouse).divide(2);
+				const center = bottom_left.clone().sum(mouse).divide(2);
 
-				const new_sw = sw.rotate(center.x, center.y, -this.angle);
+				const adjusted_bottom_left = bottom_left.rotate(center.x, center.y, -this.angle);
 
-				const ne = c.rotate(center.x, center.y, -this.angle);
+				const top_right = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = new_sw.x;
-				this.y = ne.y;
-				this.width = ne.x - new_sw.x;
-				this.height = new_sw.y - ne.y;
+				this.x = adjusted_bottom_left.x;
+				this.y = top_right.y;
+				this.width = top_right.x - adjusted_bottom_left.x;
+				this.height = adjusted_bottom_left.y - top_right.y;
 
 				break;
 			}
 
 			case 'nor-west': {
-				const se = Vector.from(this.x + this.width, this.y + this.height).rotate(
+				const bottom_right = Vector.from(this.x + this.width, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = se.clone().sum(mouse).divide(2);
+				const center = bottom_right.clone().sum(mouse).divide(2);
 
-				const new_se = se.rotate(center.x, center.y, -this.angle);
-				const ne = c.rotate(center.x, center.y, -this.angle);
+				const adjusted_bottom_right = bottom_right.rotate(center.x, center.y, -this.angle);
+				const top_right = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = ne.x;
-				this.y = ne.y;
-				this.width = new_se.x - ne.x;
-				this.height = new_se.y - ne.y;
+				this.x = top_right.x;
+				this.y = top_right.y;
+				this.width = adjusted_bottom_right.x - top_right.x;
+				this.height = adjusted_bottom_right.y - top_right.y;
 
 				break;
 			}
 
 			case 'east': {
-				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
-
-				const new_c = Vector.from(c.x, this.y + this.height).rotate(
+				const top_left = Vector.from(this.x, this.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = nw.clone().sum(new_c).divide(2);
+				const cursor = Vector.from(c.x, this.y + this.height).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
 
-				const new_nw = nw.rotate(center.x, center.y, -this.angle);
-				const se = new_c.rotate(center.x, center.y, -this.angle);
+				const center = top_left.clone().sum(cursor).divide(2);
 
-				this.x = new_nw.x;
-				this.y = new_nw.y;
-				this.width = se.x - nw.x;
-				this.height = se.y - nw.y;
+				const adjusted_top_left = top_left.rotate(center.x, center.y, -this.angle);
+				const bottom_right = cursor.rotate(center.x, center.y, -this.angle);
+
+				this.x = adjusted_top_left.x;
+				this.y = adjusted_top_left.y;
+				this.width = bottom_right.x - top_left.x;
+				this.height = bottom_right.y - top_left.y;
 				break;
 			}
 
 			case 'south': {
-				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
-
-				const new_c = Vector.from(this.x + this.width, mouse.y).rotate(
+				const top_left = Vector.from(this.x, this.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = nw.clone().sum(new_c).divide(2);
+				const cursor = Vector.from(this.x + this.width, mouse.y).rotate(
+					this.center.x,
+					this.center.y,
+					this.angle
+				);
 
-				const new_nw = nw.rotate(center.x, center.y, -this.angle);
-				const se = new_c.rotate(center.x, center.y, -this.angle);
+				const center = top_left.clone().sum(cursor).divide(2);
 
-				this.x = new_nw.x;
-				this.y = se.y;
-				this.width = se.x - new_nw.x;
-				this.height = nw.y - se.y;
+				const adjusted_top_left = top_left.rotate(center.x, center.y, -this.angle);
+				const bottom_right = cursor.rotate(center.x, center.y, -this.angle);
+
+				this.x = adjusted_top_left.x;
+				this.y = adjusted_top_left.y;
+				this.width = bottom_right.x - adjusted_top_left.x;
+				this.height = bottom_right.y - adjusted_top_left.y;
 				break;
 			}
 
 			case 'north': {
-				const sw = Vector.from(this.x, this.y + this.height).rotate(
+				const bottom_right = Vector.from(this.x, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const new_c = Vector.from(this.x + this.width, mouse.y).rotate(
+				const cursor = Vector.from(this.x + this.width, mouse.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = sw.clone().sum(new_c).divide(2);
+				const center = bottom_right.clone().sum(cursor).divide(2);
 
-				const new_sw = sw.rotate(center.x, center.y, -this.angle);
-				const se = new_c.rotate(center.x, center.y, -this.angle);
+				const adjusted_bottom_right = bottom_right.rotate(center.x, center.y, -this.angle);
+				const top_right = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = new_sw.x;
-				this.y = se.y;
-				this.width = se.x - new_sw.x;
-				this.height = new_sw.y - se.y;
+				this.x = adjusted_bottom_right.x;
+				this.y = top_right.y;
+				this.width = top_right.x - adjusted_bottom_right.x;
+				this.height = adjusted_bottom_right.y - top_right.y;
 
 				break;
 			}
 
 			case 'west': {
-				const ne = Vector.from(this.x + this.width, this.y).rotate(
+				const top_right = Vector.from(this.x + this.width, this.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const new_c = Vector.from(mouse.x, this.y + this.height).rotate(
+				const cursor = Vector.from(mouse.x, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = ne.clone().sum(new_c).divide(2);
+				const center = top_right.clone().sum(cursor).divide(2);
 
-				const new_ne = ne.rotate(center.x, center.y, -this.angle);
-				const sw = new_c.rotate(center.x, center.y, -this.angle);
+				const adjusted_top_right = top_right.rotate(center.x, center.y, -this.angle);
+				const bottom_left = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = new_ne.x;
-				this.y = new_ne.y;
-				this.width = sw.x - ne.x;
-				this.height = sw.y - ne.y;
+				this.x = bottom_left.x;
+				this.y = adjusted_top_right.y;
+				this.width = adjusted_top_right.x - bottom_left.x;
+				this.height = bottom_left.y - top_right.y;
 
 				break;
 			}
