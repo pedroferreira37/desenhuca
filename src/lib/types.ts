@@ -1,7 +1,5 @@
 import type { Options } from 'roughjs/bin/core';
 import { Vector } from './math/vector';
-import type { AABB } from './collision/aabb';
-import type { Gizmo } from './collision/bounding-box';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'segment';
