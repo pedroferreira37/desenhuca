@@ -5,7 +5,6 @@ import type { RoughCanvas } from 'roughjs/bin/canvas';
 export type ShapeType = 'rectangle' | 'ellipse' | 'segment';
 
 export interface Shape {
-	id: string;
 	type: ShapeType;
 	vertices: Vector[];
 	reference: Vector[];

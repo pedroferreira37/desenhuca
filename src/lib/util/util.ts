@@ -51,8 +51,8 @@ export function calculate_scale_factor(current: Vector, previous: Vector, anchor
 	return Vector.from(cur_offset.x / prev_offset.x, cur_offset.y / prev_offset.y);
 }
 
-export function get_tool_by_shortcut(key: string): Tool {
-	if (!/^\d$/.test(key)) return 'pointer';
+export function get_tool_by_shortcut(key: string): Tool | null {
+	if (!/^\d$/.test(key)) return null;
 
 	return shortcuts[+key - 1] ?? 'pointer';
 }
