@@ -9,14 +9,14 @@
 
 	let { x, y, width, height, completed }: Props = $props();
 
-	const is_width_negative = $derived(width < 0);
-	const is_height_negative = $derived(height < 0);
+	const isWidthNegative = $derived(width < 0);
+	const isHeightNegative = $derived(height < 0);
 </script>
 
 <div
 	style="
-	left: {is_width_negative ? x + width : x}px; 
-	top: {is_height_negative ? y + height : y}px; 
+	left: {isWidthNegative ? x + width : x}px; 
+	top: {isHeightNegative ? y + height : y}px; 
 	width: {Math.abs(width)}px; 
 	height: {Math.abs(height)}px;"
 	onpointerup={() => completed()}

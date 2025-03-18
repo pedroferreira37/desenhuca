@@ -27,14 +27,14 @@ export class AABB {
 	}
 
 	normalize() {
-		const min_x = Math.min(this.x, this.x + this.width);
-		const max_x = Math.max(this.x, this.x + this.width);
-		const min_y = Math.min(this.y, this.y + this.height);
-		const max_y = Math.max(this.y, this.y + this.height);
+		const xmin = Math.min(this.x, this.x + this.width);
+		const xmax = Math.max(this.x, this.x + this.width);
+		const ymin = Math.min(this.y, this.y + this.height);
+		const ymax = Math.max(this.y, this.y + this.height);
 
-		this.x = min_x;
-		this.width = max_x - min_x;
-		this.y = min_y;
-		this.height = max_y - min_y;
+		this.x = xmin;
+		this.width = xmax - xmin;
+		this.y = ymin;
+		this.height = ymax - ymin;
 	}
 }

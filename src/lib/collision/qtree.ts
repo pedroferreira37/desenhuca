@@ -75,38 +75,38 @@ export class QuadTree {
 		return false;
 	}
 
-	query_in_range(range: AABB, found: Shape[]) {
+	queryInRange(range: AABB, found: Shape[]) {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
-			const vertices = shape.vertices.map((vertice) =>
-				vertice.clone().rotate(shape.center.x, shape.center.y, -shape.angle)
+			const vertices = shape.vertices.map((v) =>
+				v.rotate(shape.center.x, shape.center.y, -shape.angle)
 			);
 
 			if (vertices.every((v) => range.contains(v.x, v.y))) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.query_in_range(range, found);
-			this.northeast!.query_in_range(range, found);
-			this.southwest!.query_in_range(range, found);
-			this.southeast!.query_in_range(range, found);
+			this.northwest!.queryInRange(range, found);
+			this.northeast!.queryInRange(range, found);
+			this.southwest!.queryInRange(range, found);
+			this.southeast!.queryInRange(range, found);
 		}
 
 		return found;
 	}
 
-	query_at(pos: Vector, found: Shape[]) {
+	queryAt(pos: Vector, found: Shape[]) {
 		if (!this.boundary.contains(pos.x, pos.y)) return found;
 		for (const shape of this.shapes) {
 			if (shape.intersects(pos)) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.query_at(pos, found);
-			this.northeast!.query_at(pos, found);
-			this.southwest!.query_at(pos, found);
-			this.southeast!.query_at(pos, found);
+			this.northwest!.queryAt(pos, found);
+			this.northeast!.queryAt(pos, found);
+			this.southwest!.queryAt(pos, found);
+			this.southeast!.queryAt(pos, found);
 		}
 
 		return found;

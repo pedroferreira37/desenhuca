@@ -1,5 +1,5 @@
 import { Vector } from '$lib/math/vector';
-import type { Direction, DrawOptions, Shape } from '$lib/types';
+import type { Direction, DrawOptions, RotationOptions, Shape } from '$lib/types';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 
 export class Ellipse implements Shape {
@@ -19,18 +19,13 @@ export class Ellipse implements Shape {
 		private options: DrawOptions
 	) {}
 
-	set_offset(v: Vector): void {
-		const offset = v.clone().substract(Vector.from(this.x, this.y));
-		this.offset.set(offset.x, offset.y);
-	}
-
 	move(v: Vector): void {
 		this.x = v.x;
 		this.y = v.y;
 	}
 
 	rotate(angle: number) {
-		this.angle += angle;
+		this.angle = angle;
 	}
 
 	intersects(v: Vector): boolean {
@@ -40,10 +35,10 @@ export class Ellipse implements Shape {
 		const rx = this.width / 2;
 		const ry = this.height / 2;
 
-		const normalized_x = ((v.x - cx) * (v.x - cx)) / rx ** 2;
-		const normalized_y = ((v.y - cy) * (v.y - cy)) / ry ** 2;
+		const xnormalized = ((v.x - cx) * (v.x - cx)) / rx ** 2;
+		const ynormalized = ((v.y - cy) * (v.y - cy)) / ry ** 2;
 
-		return normalized_x + normalized_y <= 1;
+		return xnormalized + ynormalized <= 1;
 	}
 
 	contains(v: Vector): boolean {
@@ -62,97 +57,91 @@ export class Ellipse implements Shape {
 	}
 
 	adjust(direction: Direction, mouse: Vector) {
-		const c = mouse.clone();
+		const c = mouse;
+
+		const [nw, sw, se, ne] = this.vertices;
 
 		switch (direction) {
 			case 'south-west': {
-				const top_right = Vector.from(this.x + this.width, this.y).rotate(
+				const ne = Vector.from(this.x + this.width, this.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = top_right.clone().sum(c).divide(2);
+				const center = ne.sum(c).divide(2);
 
-				const adjusted_top_right = top_right.rotate(center.x, center.y, -this.angle);
+				const adjustedNw = ne.rotate(center.x, center.y, -this.angle);
 
-				const bottom_left = c.rotate(center.x, center.y, -this.angle);
+				const sw = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = bottom_left.x;
-				this.y = adjusted_top_right.y;
-				this.width = adjusted_top_right.x - bottom_left.x;
-				this.height = bottom_left.y - adjusted_top_right.y;
+				this.x = sw.x;
+				this.y = adjustedNw.y;
+				this.width = adjustedNw.x - sw.x;
+				this.height = sw.y - adjustedNw.y;
 
 				break;
 			}
 
 			case 'south-east': {
-				const top_left = Vector.from(this.x, this.y).rotate(
-					this.center.x,
-					this.center.y,
-					this.angle
-				);
+				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
 
-				const center = top_left.clone().sum(mouse).divide(2);
+				const center = nw.sum(mouse).divide(2);
 
-				const adjusted_top_left = top_left.rotate(center.x, center.y, -this.angle);
-				const bottom_right = c.rotate(center.x, center.y, -this.angle);
+				const adjustedNw = nw.rotate(center.x, center.y, -this.angle);
+				const se = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjusted_top_left.x;
-				this.y = adjusted_top_left.y;
-				this.width = bottom_right.x - adjusted_top_left.x;
-				this.height = bottom_right.y - adjusted_top_left.y;
+				this.x = adjustedNw.x;
+				this.y = adjustedNw.y;
+				this.width = se.x - adjustedNw.x;
+				this.height = se.y - adjustedNw.y;
 
 				break;
 			}
 
 			case 'nor-east': {
-				const bottom_left = Vector.from(this.x, this.y + this.height).rotate(
+				const sw = Vector.from(this.x, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = bottom_left.clone().sum(mouse).divide(2);
+				const center = sw.sum(mouse).divide(2);
 
-				const adjusted_bottom_left = bottom_left.rotate(center.x, center.y, -this.angle);
+				const adjustedSw = sw.rotate(center.x, center.y, -this.angle);
 
-				const top_right = c.rotate(center.x, center.y, -this.angle);
+				const nw = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjusted_bottom_left.x;
-				this.y = top_right.y;
-				this.width = top_right.x - adjusted_bottom_left.x;
-				this.height = adjusted_bottom_left.y - top_right.y;
+				this.x = adjustedSw.x;
+				this.y = nw.y;
+				this.width = nw.x - adjustedSw.x;
+				this.height = adjustedSw.y - nw.y;
 
 				break;
 			}
 
 			case 'nor-west': {
-				const bottom_right = Vector.from(this.x + this.width, this.y + this.height).rotate(
+				const se = Vector.from(this.x + this.width, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
 				);
 
-				const center = bottom_right.clone().sum(mouse).divide(2);
+				const center = se.sum(mouse).divide(2);
 
-				const adjusted_bottom_right = bottom_right.rotate(center.x, center.y, -this.angle);
-				const top_right = c.rotate(center.x, center.y, -this.angle);
+				const adjustedSe = se.rotate(center.x, center.y, -this.angle);
+				const nw = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = top_right.x;
-				this.y = top_right.y;
-				this.width = adjusted_bottom_right.x - top_right.x;
-				this.height = adjusted_bottom_right.y - top_right.y;
+				this.x = nw.x;
+				this.y = nw.y;
+				this.width = adjustedSe.x - nw.x;
+				this.height = adjustedSe.y - nw.y;
 
 				break;
 			}
 
 			case 'east': {
-				const top_left = Vector.from(this.x, this.y).rotate(
-					this.center.x,
-					this.center.y,
-					this.angle
-				);
+				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
 
 				const cursor = Vector.from(c.x, this.y + this.height).rotate(
 					this.center.x,
@@ -160,24 +149,20 @@ export class Ellipse implements Shape {
 					this.angle
 				);
 
-				const center = top_left.clone().sum(cursor).divide(2);
+				const center = nw.sum(cursor).divide(2);
 
-				const adjusted_top_left = top_left.rotate(center.x, center.y, -this.angle);
-				const bottom_right = cursor.rotate(center.x, center.y, -this.angle);
+				const adjustedNw = nw.rotate(center.x, center.y, -this.angle);
+				const se = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjusted_top_left.x;
-				this.y = adjusted_top_left.y;
-				this.width = bottom_right.x - top_left.x;
-				this.height = bottom_right.y - top_left.y;
+				this.x = adjustedNw.x;
+				this.y = adjustedNw.y;
+				this.width = se.x - adjustedNw.x;
+				this.height = se.y - adjustedNw.y;
 				break;
 			}
 
 			case 'south': {
-				const top_left = Vector.from(this.x, this.y).rotate(
-					this.center.x,
-					this.center.y,
-					this.angle
-				);
+				const nw = Vector.from(this.x, this.y).rotate(this.center.x, this.center.y, this.angle);
 
 				const cursor = Vector.from(this.x + this.width, mouse.y).rotate(
 					this.center.x,
@@ -185,20 +170,20 @@ export class Ellipse implements Shape {
 					this.angle
 				);
 
-				const center = top_left.clone().sum(cursor).divide(2);
+				const center = nw.sum(cursor).divide(2);
 
-				const adjusted_top_left = top_left.rotate(center.x, center.y, -this.angle);
-				const bottom_right = cursor.rotate(center.x, center.y, -this.angle);
+				const adjustedNw = nw.rotate(center.x, center.y, -this.angle);
+				const se = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjusted_top_left.x;
-				this.y = adjusted_top_left.y;
-				this.width = bottom_right.x - adjusted_top_left.x;
-				this.height = bottom_right.y - adjusted_top_left.y;
+				this.x = adjustedNw.x;
+				this.y = adjustedNw.y;
+				this.width = se.x - adjustedNw.x;
+				this.height = se.y - adjustedNw.y;
 				break;
 			}
 
 			case 'north': {
-				const bottom_right = Vector.from(this.x, this.y + this.height).rotate(
+				const ne = Vector.from(this.x, this.y + this.height).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
@@ -210,21 +195,21 @@ export class Ellipse implements Shape {
 					this.angle
 				);
 
-				const center = bottom_right.clone().sum(cursor).divide(2);
+				const center = ne.sum(cursor).divide(2);
 
-				const adjusted_bottom_right = bottom_right.rotate(center.x, center.y, -this.angle);
-				const top_right = cursor.rotate(center.x, center.y, -this.angle);
+				const adjustedSw = ne.rotate(center.x, center.y, -this.angle);
+				const nw = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjusted_bottom_right.x;
-				this.y = top_right.y;
-				this.width = top_right.x - adjusted_bottom_right.x;
-				this.height = adjusted_bottom_right.y - top_right.y;
+				this.x = adjustedSw.x;
+				this.y = nw.y;
+				this.width = nw.x - adjustedSw.x;
+				this.height = adjustedSw.y - nw.y;
 
 				break;
 			}
 
 			case 'west': {
-				const top_right = Vector.from(this.x + this.width, this.y).rotate(
+				const ne = Vector.from(this.x + this.width, this.y).rotate(
 					this.center.x,
 					this.center.y,
 					this.angle
@@ -236,15 +221,15 @@ export class Ellipse implements Shape {
 					this.angle
 				);
 
-				const center = top_right.clone().sum(cursor).divide(2);
+				const center = ne.sum(cursor).divide(2);
 
-				const adjusted_top_right = top_right.rotate(center.x, center.y, -this.angle);
-				const bottom_left = cursor.rotate(center.x, center.y, -this.angle);
+				const adjustedNe = ne.rotate(center.x, center.y, -this.angle);
+				const sw = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = bottom_left.x;
-				this.y = adjusted_top_right.y;
-				this.width = adjusted_top_right.x - bottom_left.x;
-				this.height = bottom_left.y - top_right.y;
+				this.x = sw.x;
+				this.y = adjustedNe.y;
+				this.width = adjustedNe.x - sw.x;
+				this.height = sw.y - adjustedNe.y;
 
 				break;
 			}
@@ -252,18 +237,18 @@ export class Ellipse implements Shape {
 	}
 
 	normalize() {
-		const min_x = Math.min(this.x, this.x + this.width);
-		const max_x = Math.max(this.x, this.x + this.width);
-		const min_y = Math.min(this.y, this.y + this.height);
-		const max_y = Math.max(this.y, this.y + this.height);
+		const xmin = Math.min(this.x, this.x + this.width);
+		const xmax = Math.max(this.x, this.x + this.width);
+		const ymin = Math.min(this.y, this.y + this.height);
+		const ymax = Math.max(this.y, this.y + this.height);
 
-		this.x = min_x;
-		this.width = max_x - min_x;
-		this.y = min_y;
-		this.height = max_y - min_y;
+		this.x = xmin;
+		this.width = xmax - xmin;
+		this.y = ymin;
+		this.height = ymax - ymin;
 	}
 
-	draw(c: CanvasRenderingContext2D, r: RoughCanvas): void {
+	draw(c: CanvasRenderingContext2D, r: RoughCanvas) {
 		if (this.rotated) {
 			c.save();
 			c.translate(this.center.x, this.center.y);
@@ -274,6 +259,7 @@ export class Ellipse implements Shape {
 		}
 
 		c.save();
+
 		r.ellipse(this.center.x, this.center.y, this.width, this.height, this.options);
 		c.restore();
 	}
