@@ -1,12 +1,12 @@
 import { it, expect } from 'vitest';
 import { Vector } from '$lib/math/vector';
 import create from '$lib/shape-factory';
-import { calculate_scale_factor, calculate_scaled_dimensions } from '$lib/util/util';
+import { calculateScaleFactor, calculateScaledDimensions } from '$lib/util/util';
 
 it('scale factor is calculated correctly', () => {
 	const expected = Vector.from(3, 3);
 
-	const actual = calculate_scale_factor(
+	const actual = calculateScaleFactor(
 		Vector.from(50, 50),
 		Vector.from(30, 30),
 		Vector.from(20, 20)
@@ -19,7 +19,7 @@ it('scale factor is calculated correctly', () => {
 it('handles scaling only in x direction', () => {
 	const expected = Vector.from(2, 1);
 
-	const actual = calculate_scale_factor(
+	const actual = calculateScaleFactor(
 		Vector.from(40, 30),
 		Vector.from(30, 30),
 		Vector.from(20, 20)
@@ -32,7 +32,7 @@ it('handles scaling only in x direction', () => {
 it('handles scaling only in y direction', () => {
 	const expected = Vector.from(1, 2);
 
-	const actual = calculate_scale_factor(
+	const actual = calculateScaleFactor(
 		Vector.from(30, 40),
 		Vector.from(30, 30),
 		Vector.from(20, 20)
@@ -45,7 +45,7 @@ it('handles scaling only in y direction', () => {
 it('handles negative scale factors', () => {
 	const expected = Vector.from(-1, -1);
 
-	const actual = calculate_scale_factor(
+	const actual = calculateScaleFactor(
 		Vector.from(10, 10),
 		Vector.from(30, 30),
 		Vector.from(20, 20)
@@ -58,7 +58,7 @@ it('handles negative scale factors', () => {
 it('handles zero scale factor', () => {
 	const expected = Vector.from(0, 0);
 
-	const actual = calculate_scale_factor(
+	const actual = calculateScaleFactor(
 		Vector.from(20, 20),
 		Vector.from(30, 30),
 		Vector.from(20, 20)
@@ -69,8 +69,8 @@ it('handles zero scale factor', () => {
 });
 
 it('scales dimensions correctly with factor (2, 2) and origin anchor', () => {
-	const top_left = Vector.from(10, 10);
-	const bottom_right = Vector.from(30, 30);
+	const nw = Vector.from(10, 10);
+	const se = Vector.from(30, 30);
 	const anchor = Vector.from(0, 0);
 	const factor = Vector.from(2, 2);
 
@@ -81,7 +81,7 @@ it('scales dimensions correctly with factor (2, 2) and origin anchor', () => {
 		height: 40
 	};
 
-	const actual = calculate_scaled_dimensions(top_left, bottom_right, anchor, factor);
+	const actual = calculateScaledDimensions(nw, se, anchor, factor);
 
 	expect(actual.x).toBe(expected.x);
 	expect(actual.y).toBe(expected.y);
@@ -90,8 +90,8 @@ it('scales dimensions correctly with factor (2, 2) and origin anchor', () => {
 });
 
 it('scales dimensions correctly with different x and y factors', () => {
-	const top_left = Vector.from(10, 10);
-	const bottom_right = Vector.from(30, 30);
+	const nw = Vector.from(10, 10);
+	const se = Vector.from(30, 30);
 	const anchor = Vector.from(0, 0);
 	const factor = Vector.from(2, 0.5);
 
@@ -102,7 +102,7 @@ it('scales dimensions correctly with different x and y factors', () => {
 		height: 10
 	};
 
-	const actual = calculate_scaled_dimensions(top_left, bottom_right, anchor, factor);
+	const actual = calculateScaledDimensions(nw, se, anchor, factor);
 
 	expect(actual.x).toBe(expected.x);
 	expect(actual.y).toBe(expected.y);
@@ -111,8 +111,8 @@ it('scales dimensions correctly with different x and y factors', () => {
 });
 
 it('handles negative scale factors', () => {
-	const top_left = Vector.from(10, 10);
-	const bottom_right = Vector.from(30, 30);
+	const nw = Vector.from(10, 10);
+	const se = Vector.from(30, 30);
 	const anchor = Vector.from(0, 0);
 	const factor = Vector.from(-1, -1);
 
@@ -123,7 +123,7 @@ it('handles negative scale factors', () => {
 		height: -20
 	};
 
-	const actual = calculate_scaled_dimensions(top_left, bottom_right, anchor, factor);
+	const actual = calculateScaledDimensions(nw, se, anchor, factor);
 
 	expect(actual.x).toBe(expected.x);
 	expect(actual.y).toBe(expected.y);
@@ -150,7 +150,7 @@ it('scaled resizing is returning the correct dimensions', () => {
 
 	for (const [actual, expected] of tests) {
 		const [nw, , se] = expected.vertices;
-		const result = calculate_scaled_dimensions(
+		const result = calculateScaledDimensions(
 			Vector.from(actual.vertices[0].x, actual.vertices[0].y),
 			Vector.from(actual.vertices[2].x, actual.vertices[2].y),
 			anchor,

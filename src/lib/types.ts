@@ -4,14 +4,21 @@ import type { RoughCanvas } from 'roughjs/bin/canvas';
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'segment';
 
+export type GizmoHistoryEntry = {
+	center: Vector;
+	vertices: Vector[];
+	displacement: Vector;
+	angle: number;
+};
+
 export interface Shape {
+	id: string;
 	type: ShapeType;
 	vertices: Vector[];
 	reference: Vector[];
 	offset: Vector;
 	angle: number;
 	center: Vector;
-	set_offset(v: Vector): void;
 	move(v: Vector): void;
 	intersects(v: Vector): boolean;
 	contains(v: Vector): boolean;

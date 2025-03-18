@@ -1,5 +1,5 @@
 import type { Tool } from '$lib/types';
-import { get_tool_by_shortcut } from '$lib/util/util';
+import { retrieveToolByShortcut } from '$lib/util/util';
 import { expect, it } from 'vitest';
 
 it('check if the tool is according the key pressed', () => {
@@ -17,7 +17,7 @@ it('check if the tool is according the key pressed', () => {
 	];
 
 	for (const [key, expected] of tests) {
-		const tool = get_tool_by_shortcut(key);
+		const tool = retrieveToolByShortcut(key);
 		expect(tool).toBe(expected);
 	}
 });

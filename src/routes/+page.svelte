@@ -4,7 +4,7 @@
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { Vector } from '$lib/math/vector';
 	import type { Tool, Cursor, PointerMode as Mode } from '$lib/types';
-	import { get_tool_by_shortcut } from '$lib/util/util';
+	import { retrieveToolByShortcut } from '$lib/util/util';
 
 	let tool = $state<Tool>('pointer');
 	let mode = $state<Mode>('idle');
@@ -18,14 +18,14 @@
 	let width = $derived(mouse.x - last.x);
 	let height = $derived(mouse.y - last.y);
 
-	function is_ptr_events_blocked(mode: Mode) {
+	function blockPointerEvents(mode: Mode) {
 		return mode === 'move' || mode === 'resize' || mode === 'select';
 	}
 </script>
 
 <main class="absolute top-0 left-0 w-full h-full">
 	<div
-		class:pointer-events-none={drawing || selecting || is_ptr_events_blocked(mode)}
+		class:pointer-events-none={drawing || selecting || blockPointerEvents(mode)}
 		class="relative flex justify-center w-full h-full overflow-hidden"
 	>
 		<div
@@ -101,7 +101,7 @@
 	onkeydown={(event) => {
 		const key = event.key;
 
-		tool = get_tool_by_shortcut(key) ?? tool;
+		tool = retrieveToolByShortcut(key) ?? tool;
 
 		if (tool === 'pointer') {
 			cursor = 'custom';

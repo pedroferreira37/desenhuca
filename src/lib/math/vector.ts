@@ -4,7 +4,7 @@ export class Vector {
 	}
 
 	static zero() {
-		return new Vector(0, 0);
+		return Vector.from(0, 0);
 	}
 
 	private constructor(
@@ -13,7 +13,7 @@ export class Vector {
 	) {}
 
 	clone() {
-		return new Vector(this.x, this.y);
+		return Vector.from(this.x, this.y);
 	}
 
 	set(x: number, y: number) {
@@ -23,24 +23,15 @@ export class Vector {
 	}
 
 	substract(v: Vector) {
-		this.x -= v.x;
-		this.y -= v.y;
-		return this;
+		return Vector.from(this.x - v.x, this.y - v.y);
 	}
 
-	sum(v: Vector) {
-		this.x += v.x;
-		this.y += v.y;
-		return this;
+	sum(v: Vector): Vector {
+		return Vector.from(this.x + v.x, this.y + v.y);
 	}
 
-	divide(scalar: number) {
-		if (scalar !== 0) {
-			this.x /= scalar;
-			this.y /= scalar;
-		}
-
-		return this;
+	divide(scalar: number): Vector {
+		return Vector.from(this.x / scalar, this.y / scalar);
 	}
 
 	scale(scalar: number) {
@@ -49,19 +40,13 @@ export class Vector {
 		return this;
 	}
 
-	dot(v: Vector) {
-		return this.x * v.x + this.y * v.y;
-	}
-
-	rotate(cx: number, cy: number, angle: number) {
+	rotate(cx: number, cy: number, angle: number): Vector {
 		const cos = Math.cos(angle);
 		const sin = Math.sin(angle);
 
-		const point = this.clone();
-
-		this.x = (point.x - cx) * cos - (point.y - cy) * sin + cx;
-		this.y = (point.x - cx) * sin + (point.y - cy) * cos + cy;
-
-		return this;
+		return Vector.from(
+			cx + (this.x - cx) * cos - sin * (this.y - cy),
+			cy + (this.x - cx) * sin + cos * (this.y - cy)
+		);
 	}
 }

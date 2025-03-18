@@ -25,29 +25,28 @@ export class BoundingBox {
 			return;
 		}
 
-		const min = Vector.from(Infinity, Infinity);
-		const max = Vector.from(-Infinity, -Infinity);
+		let xmin = Infinity;
+		let ymin = Infinity;
+		let xmax = -Infinity;
+		let ymax = -Infinity;
 
 		for (const shape of shapes) {
 			const rotate = shapes.length > 1;
 
-			const [nw, sw, se, ne] = rotate
-				? shape.vertices.map((v) => v.clone().rotate(shape.center.x, shape.center.y, -shape.angle))
-				: shape.vertices;
+			shape.vertices.forEach((v) => {
+				const p = rotate ? v.rotate(shape.center.x, shape.center.y, shape.angle) : v;
 
-			min.set(Math.min(min.x, nw.x, sw.x, se.x, ne.x), Math.min(min.y, nw.y, sw.y, se.y, ne.y));
-			max.set(Math.max(max.x, nw.x, sw.x, se.x, ne.x), Math.max(max.y, nw.y, sw.y, se.y, ne.y));
+				xmin = Math.min(xmin, p.x);
+				ymin = Math.min(ymin, p.y);
+				xmax = Math.max(xmax, p.x);
+				ymax = Math.max(ymax, p.y);
+			});
 		}
 
-		this.x = min.x;
-		this.y = min.y;
-
-		const size = max.substract(min);
-
-		this.center.set(min.x + size.x / 2, min.y + size.y / 2);
-
-		this.width = size.x;
-		this.height = size.y;
+		this.x = xmin;
+		this.y = ymin;
+		this.width = xmax - xmin;
+		this.height = ymax - ymin;
 	}
 
 	get center(): Vector {
@@ -67,10 +66,10 @@ export class BoundingBox {
 		];
 	}
 
-	draw(c: CanvasRenderingContext2D, angle: number = 0, dashed: boolean = false) {
+	draw(c: CanvasRenderingContext2D, angle: number = 0) {
 		const center = this.center;
 
-		const offset = SIZE / 2;
+		const offset = 8 / 2;
 
 		const rotated = angle !== 0;
 
@@ -131,8 +130,6 @@ export class BoundingBox {
 
 		c.lineWidth = 4;
 		c.strokeStyle = '#0b99ff';
-
-		if (dashed) c.setLineDash([10, 10]);
 
 		c.strokeRect(
 			this.x - offset,

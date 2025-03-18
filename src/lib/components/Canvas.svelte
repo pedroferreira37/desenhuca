@@ -72,9 +72,9 @@
 
 	let gizmo: Gizmo = new Gizmo();
 
-	let ptr_direction: Direction | null = null;
+	let ptrDirection: Direction | null = null;
 
-	let default_options = $state<Options>({
+	let baseOptions = $state<Options>({
 		seed: 4,
 		strokeWidth: 8,
 		roughness: 1
@@ -88,7 +88,7 @@
 		shapes.forEach((shape) => shape.draw(c, r));
 	}
 
-	function render_scene(c: CanvasRenderingContext2D, r: RoughCanvas, gizmo: Gizmo) {
+	function renderScene(c: CanvasRenderingContext2D, r: RoughCanvas, gizmo: Gizmo) {
 		clear(c);
 		redraw(c, r);
 
@@ -109,12 +109,14 @@
 				}
 
 				if (gizmo.intersects(last)) {
-					gizmo.prepare_to_resize(last.clone());
+					gizmo.setAnchor(last);
+					gizmo.save();
 					resize();
 					return;
 				}
 
-				if (gizmo.intersectaion_rotation_pivot(last)) {
+				if (gizmo.intersectsRotationPivot(last)) {
+					gizmo.save();
 					rotate();
 					return;
 				}
@@ -123,14 +125,14 @@
 
 				select();
 
-				render_scene(ctx, rough, gizmo);
+				renderScene(ctx, rough, gizmo);
 
 				const found: Shape[] = [];
 
-				qtree.query_at(last, found);
+				qtree.queryAt(last, found);
 
 				if (found.length) {
-					gizmo.attach(found);
+					gizmo.add(found);
 					gizmo.draw(ctx);
 					gizmo.offset(last);
 					drag();
@@ -148,7 +150,7 @@
 
 				draw();
 
-				shape = create(tool, last.x, last.y, 0, 0, default_options);
+				shape = create(tool, last.x, last.y, 0, 0, baseOptions);
 
 				break;
 		}
@@ -164,57 +166,46 @@
 						case 'select':
 							const found: Shape[] = [];
 
-							const size = mouse.clone().substract(last);
+							const size = mouse.substract(last);
 
 							const range = new AABB(last.x, last.y, size.x, size.y);
 
-							qtree.query_in_range(range, found);
-
-							console.log(found);
+							qtree.queryInRange(range, found);
 
 							if (!found.length) return;
 
-							gizmo.attach(found);
+							gizmo.add(found);
 
 							break;
 						case 'rotate':
-							const center = gizmo.center;
-
-							const offset_from_origin = last.clone().substract(center);
-
-							const offset_from_delta = mouse.clone().substract(center);
-
-							const prev_angle = Math.atan2(offset_from_origin.x, offset_from_origin.y);
-							const cur_angle = Math.atan2(offset_from_delta.x, offset_from_delta.y);
-
-							const angle = prev_angle - cur_angle;
-
-							last.set(mouse.x, mouse.y);
+							const angle =
+								Math.atan2(mouse.y - gizmo.center.y, mouse.x - gizmo.center.x) -
+								Math.atan2(last.y - gizmo.center.y, last.x - gizmo.center.x);
 
 							gizmo.rotate(angle);
 
 							break;
 						case 'resize':
-							if (!ptr_direction) return;
+							if (!ptrDirection) return;
 
-							gizmo.adjust(ptr_direction, last, mouse);
+							gizmo.adjust(ptrDirection, last, mouse);
 
 							break;
 						case 'move':
-							gizmo.move(mouse.clone());
+							gizmo.move(mouse);
 
 							break;
 						default:
 							cursor = qtree.has(mouse) ? 'move' : 'custom';
 
-							ptr_direction = gizmo.find_handle_under_cursor(mouse);
+							ptrDirection = gizmo.getHandleUnderCursor(mouse);
 
-							if (ptr_direction) {
-								cursor = directions[ptr_direction];
+							if (ptrDirection) {
+								cursor = directions[ptrDirection];
 								return;
 							}
 
-							if (gizmo.intersectaion_rotation_pivot(mouse)) {
+							if (gizmo.intersectsRotationPivot(mouse)) {
 								cursor = 'grab';
 								return;
 							}
@@ -232,7 +223,7 @@
 					if (!shape) return;
 
 					const [nw] = shape.vertices;
-					const size = mouse.clone().substract(nw);
+					const size = mouse.substract(nw);
 
 					shape.resize(size.x, size.y);
 					shape.draw(ctx, rough);
@@ -241,7 +232,7 @@
 			}
 		});
 
-		render_scene(ctx, rough, gizmo);
+		renderScene(ctx, rough, gizmo);
 	}
 
 	function onpointerup() {
@@ -249,7 +240,7 @@
 
 		cursor = 'custom';
 
-		gizmo.normalize();
+		//gizmo.normalize();
 
 		if (!shape) return;
 
@@ -260,9 +251,9 @@
 
 		qtree.insert(shape);
 
-		gizmo.attach([shape]);
+		gizmo.add([shape]);
 
-		render_scene(ctx, rough, gizmo);
+		renderScene(ctx, rough, gizmo);
 
 		shape = null;
 	}
@@ -279,7 +270,7 @@
 		canvas.style.height = `${rect.height}px`;
 	}
 
-	function window_resize() {
+	function windowResize() {
 		crispify();
 		redraw(ctx, rough);
 
@@ -295,12 +286,12 @@
 		const boundary = new AABB(0, 0, canvas.width, canvas.height);
 		qtree = new QuadTree(boundary, 4);
 
-		window.addEventListener('resize', window_resize);
-		document.addEventListener('visibilitychange', window_resize);
+		window.addEventListener('resize', windowResize);
+		document.addEventListener('visibilitychange', windowResize);
 
 		return () => {
-			window.removeEventListener('resize', window_resize);
-			document.removeEventListener('visibilitychange', window_resize);
+			window.removeEventListener('resize', windowResize);
+			document.removeEventListener('visibilitychange', windowResize);
 		};
 	}
 
