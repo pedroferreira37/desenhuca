@@ -58,9 +58,12 @@ export class QuadTree {
 		this.divided = true;
 	}
 
+	// TODO: Fix this to accept contains, because segment intersects function only intersects start and on
+	// of the segment
 	has(pos: Vector): boolean {
 		for (const shape of this.shapes) {
-			if (shape.intersects(pos)) return true;
+			const match = shape.type === 'segment' ? shape.contains(pos) : shape.intersects(pos);
+			if (match) return true;
 		}
 
 		if (this.divided) {
@@ -75,7 +78,7 @@ export class QuadTree {
 		return false;
 	}
 
-	queryInRange(range: AABB, found: Shape[]) {
+	query_in_range(range: AABB, found: Shape[]) {
 		if (!this.boundary.intersects(range)) return found;
 
 		for (const shape of this.shapes) {
@@ -87,26 +90,31 @@ export class QuadTree {
 		}
 
 		if (this.divided) {
-			this.northwest!.queryInRange(range, found);
-			this.northeast!.queryInRange(range, found);
-			this.southwest!.queryInRange(range, found);
-			this.southeast!.queryInRange(range, found);
+			this.northwest!.query_in_range(range, found);
+			this.northeast!.query_in_range(range, found);
+			this.southwest!.query_in_range(range, found);
+			this.southeast!.query_in_range(range, found);
 		}
 
 		return found;
 	}
 
-	queryAt(pos: Vector, found: Shape[]) {
+	query_at(pos: Vector, found: Shape[]) {
 		if (!this.boundary.contains(pos.x, pos.y)) return found;
 		for (const shape of this.shapes) {
+			if (shape.type === 'segment') {
+				if (shape.contains(pos)) found.push(shape);
+				return;
+			}
+
 			if (shape.intersects(pos)) found.push(shape);
 		}
 
 		if (this.divided) {
-			this.northwest!.queryAt(pos, found);
-			this.northeast!.queryAt(pos, found);
-			this.southwest!.queryAt(pos, found);
-			this.southeast!.queryAt(pos, found);
+			this.northwest!.query_at(pos, found);
+			this.northeast!.query_at(pos, found);
+			this.southwest!.query_at(pos, found);
+			this.southeast!.query_at(pos, found);
 		}
 
 		return found;

@@ -1,8 +1,13 @@
+import { RectangularBoundingBox } from '$lib/collision/rectangular-bounding-box';
 import { Vector } from '$lib/math/vector';
-import type { Direction, DrawOptions, RotationOptions, Shape } from '$lib/types';
+import type { BoundingBox, Direction, DrawOptions, Shape } from '$lib/types';
+import { uuid } from '$lib/util/util';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
+import type { Options } from 'roughjs/bin/core';
 
 export class Ellipse implements Shape {
+	public id: string = uuid();
+
 	public type: 'ellipse' = 'ellipse';
 
 	public offset: Vector = Vector.zero();
@@ -255,13 +260,11 @@ export class Ellipse implements Shape {
 			c.rotate(this.angle);
 			r.ellipse(0, 0, this.width, this.height, this.options);
 			c.restore();
+
 			return;
 		}
 
-		c.save();
-
 		r.ellipse(this.center.x, this.center.y, this.width, this.height, this.options);
-		c.restore();
 	}
 
 	get vertices(): Vector[] {
@@ -273,8 +276,22 @@ export class Ellipse implements Shape {
 		];
 	}
 
+	customize(options: Options): void {
+		this.options = { ...this.options, ...options };
+	}
+
 	get center() {
 		return Vector.from(this.x + this.width / 2, this.y + this.height / 2);
+	}
+
+	get AABB(): BoundingBox {
+		return new RectangularBoundingBox(
+			this.x,
+			this.y,
+			this.x + this.width,
+			this.y + this.height,
+			this.angle
+		);
 	}
 
 	get rotated() {

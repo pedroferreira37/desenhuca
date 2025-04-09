@@ -1,7 +1,9 @@
+import { RectangularBoundingBox } from '$lib/collision/rectangular-bounding-box';
 import { Vector } from '$lib/math/vector';
 import type { Direction, DrawOptions, Shape } from '$lib/types';
 import { uuid } from '$lib/util/util';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
+import type { Options } from 'roughjs/bin/core';
 
 const PADDING = 16;
 
@@ -76,14 +78,14 @@ export class Rectangle implements Shape {
 
 				const center = ne.sum(c).divide(2);
 
-				const adjustedNw = ne.rotate(center.x, center.y, -this.angle);
+				const adjusted_nw = ne.rotate(center.x, center.y, -this.angle);
 
 				const sw = c.rotate(center.x, center.y, -this.angle);
 
 				this.x = sw.x;
-				this.y = adjustedNw.y;
-				this.width = adjustedNw.x - sw.x;
-				this.height = sw.y - adjustedNw.y;
+				this.y = adjusted_nw.y;
+				this.width = adjusted_nw.x - sw.x;
+				this.height = sw.y - adjusted_nw.y;
 
 				break;
 			}
@@ -93,13 +95,13 @@ export class Rectangle implements Shape {
 
 				const center = nw.sum(mouse).divide(2);
 
-				const adjustedNw = nw.rotate(center.x, center.y, -this.angle);
+				const adjusted_nw = nw.rotate(center.x, center.y, -this.angle);
 				const se = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjustedNw.x;
-				this.y = adjustedNw.y;
-				this.width = se.x - adjustedNw.x;
-				this.height = se.y - adjustedNw.y;
+				this.x = adjusted_nw.x;
+				this.y = adjusted_nw.y;
+				this.width = se.x - adjusted_nw.x;
+				this.height = se.y - adjusted_nw.y;
 
 				break;
 			}
@@ -113,14 +115,14 @@ export class Rectangle implements Shape {
 
 				const center = sw.sum(mouse).divide(2);
 
-				const adjustedSw = sw.rotate(center.x, center.y, -this.angle);
+				const adjusted_sw = sw.rotate(center.x, center.y, -this.angle);
 
 				const nw = c.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjustedSw.x;
+				this.x = adjusted_sw.x;
 				this.y = nw.y;
-				this.width = nw.x - adjustedSw.x;
-				this.height = adjustedSw.y - nw.y;
+				this.width = nw.x - adjusted_sw.x;
+				this.height = adjusted_sw.y - nw.y;
 
 				break;
 			}
@@ -156,13 +158,13 @@ export class Rectangle implements Shape {
 
 				const center = nw.sum(cursor).divide(2);
 
-				const adjustedNw = nw.rotate(center.x, center.y, -this.angle);
+				const adjusted_nw = nw.rotate(center.x, center.y, -this.angle);
 				const se = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjustedNw.x;
-				this.y = adjustedNw.y;
-				this.width = se.x - adjustedNw.x;
-				this.height = se.y - adjustedNw.y;
+				this.x = adjusted_nw.x;
+				this.y = adjusted_nw.y;
+				this.width = se.x - adjusted_nw.x;
+				this.height = se.y - adjusted_nw.y;
 				break;
 			}
 
@@ -177,13 +179,13 @@ export class Rectangle implements Shape {
 
 				const center = nw.sum(cursor).divide(2);
 
-				const adjustedNw = nw.rotate(center.x, center.y, -this.angle);
+				const adjusted_nw = nw.rotate(center.x, center.y, -this.angle);
 				const se = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjustedNw.x;
-				this.y = adjustedNw.y;
-				this.width = se.x - adjustedNw.x;
-				this.height = se.y - adjustedNw.y;
+				this.x = adjusted_nw.x;
+				this.y = adjusted_nw.y;
+				this.width = se.x - adjusted_nw.x;
+				this.height = se.y - adjusted_nw.y;
 				break;
 			}
 
@@ -202,13 +204,13 @@ export class Rectangle implements Shape {
 
 				const center = ne.sum(cursor).divide(2);
 
-				const adjustedSw = ne.rotate(center.x, center.y, -this.angle);
+				const adjusted_sw = ne.rotate(center.x, center.y, -this.angle);
 				const nw = cursor.rotate(center.x, center.y, -this.angle);
 
-				this.x = adjustedSw.x;
+				this.x = adjusted_sw.x;
 				this.y = nw.y;
-				this.width = nw.x - adjustedSw.x;
-				this.height = adjustedSw.y - nw.y;
+				this.width = nw.x - adjusted_sw.x;
+				this.height = adjusted_sw.y - nw.y;
 
 				break;
 			}
@@ -228,13 +230,13 @@ export class Rectangle implements Shape {
 
 				const center = ne.sum(cursor).divide(2);
 
-				const adjustedNe = ne.rotate(center.x, center.y, -this.angle);
+				const adjusted_ne = ne.rotate(center.x, center.y, -this.angle);
 				const sw = cursor.rotate(center.x, center.y, -this.angle);
 
 				this.x = sw.x;
-				this.y = adjustedNe.y;
-				this.width = adjustedNe.x - sw.x;
-				this.height = sw.y - adjustedNe.y;
+				this.y = adjusted_ne.y;
+				this.width = adjusted_ne.x - sw.x;
+				this.height = sw.y - adjusted_ne.y;
 
 				break;
 			}
@@ -262,18 +264,21 @@ export class Rectangle implements Shape {
 	}
 
 	draw(c: CanvasRenderingContext2D, r: RoughCanvas) {
-		if (this.rotated) {
+		if (this.angle !== 0) {
 			c.save();
 			c.translate(this.center.x, this.center.y);
 			c.rotate(this.angle);
 			r.rectangle(-this.width / 2, -this.height / 2, this.width, this.height, this.options);
 			c.restore();
+
 			return;
 		}
 
-		c.save();
 		r.rectangle(this.x, this.y, this.width, this.height, this.options);
-		c.restore();
+	}
+
+	customize(options: Options): void {
+		this.options = { ...this.options, ...options };
 	}
 
 	get vertices(): Vector[] {
@@ -283,6 +288,16 @@ export class Rectangle implements Shape {
 			Vector.from(this.x + this.width, this.y + this.height),
 			Vector.from(this.x + this.width, this.y)
 		];
+	}
+
+	get AABB(): RectangularBoundingBox {
+		return new RectangularBoundingBox(
+			this.x,
+			this.y,
+			this.x + this.width,
+			this.y + this.height,
+			this.angle
+		);
 	}
 
 	get center(): Vector {
