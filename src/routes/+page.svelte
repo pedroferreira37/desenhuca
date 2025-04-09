@@ -4,7 +4,7 @@
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { Vector } from '$lib/math/vector';
 	import type { Tool, Cursor, PointerMode as Mode } from '$lib/types';
-	import { retrieveToolByShortcut } from '$lib/util/util';
+	import { retrieve_tool_by_shortcut } from '$lib/util/util';
 
 	let tool = $state<Tool>('pointer');
 	let mode = $state<Mode>('idle');
@@ -101,7 +101,7 @@
 	onkeydown={(event) => {
 		const key = event.key;
 
-		tool = retrieveToolByShortcut(key) ?? tool;
+		tool = retrieve_tool_by_shortcut(key) ?? tool;
 
 		if (tool === 'pointer') {
 			cursor = 'custom';
