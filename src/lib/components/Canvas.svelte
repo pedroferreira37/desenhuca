@@ -72,9 +72,9 @@
 
 	let gizmo: Gizmo = new Gizmo();
 
-	let ptrDirection: Direction | null = null;
+	let ptr_direction: Direction | null = null;
 
-	let baseOptions = $state<Options>({
+	let base_options = $state<Options>({
 		seed: 4,
 		strokeWidth: 8,
 		roughness: 1
@@ -88,12 +88,12 @@
 		shapes.forEach((shape) => shape.draw(c, r));
 	}
 
-	function renderScene(c: CanvasRenderingContext2D, r: RoughCanvas, gizmo: Gizmo) {
+	function render_scene(c: CanvasRenderingContext2D, r: RoughCanvas, gizmo: Gizmo) {
 		clear(c);
 		redraw(c, r);
 
 		if (!gizmo.empty) {
-			gizmo.draw(c);
+			gizmo.draw(c, r);
 		}
 	}
 
@@ -109,13 +109,13 @@
 				}
 
 				if (gizmo.intersects(last)) {
-					gizmo.setAnchor(last);
+					gizmo.set_anchor(last);
 					gizmo.save();
 					resize();
 					return;
 				}
 
-				if (gizmo.intersectsRotationPivot(last)) {
+				if (gizmo.intersects_rotate_handle(last)) {
 					gizmo.save();
 					rotate();
 					return;
@@ -125,15 +125,15 @@
 
 				select();
 
-				renderScene(ctx, rough, gizmo);
+				render_scene(ctx, rough, gizmo);
 
 				const found: Shape[] = [];
 
-				qtree.queryAt(last, found);
+				qtree.query_at(last, found);
 
 				if (found.length) {
 					gizmo.add(found);
-					gizmo.draw(ctx);
+					gizmo.draw(ctx, rough);
 					gizmo.offset(last);
 					drag();
 					return;
@@ -143,6 +143,7 @@
 				mode = 'select';
 
 				break;
+
 			case 'rectangle':
 			case 'ellipse':
 			case 'segment':
@@ -150,7 +151,7 @@
 
 				draw();
 
-				shape = create(tool, last.x, last.y, 0, 0, baseOptions);
+				shape = create(tool, last.x, last.y, 0, 0, base_options);
 
 				break;
 		}
@@ -170,7 +171,7 @@
 
 							const range = new AABB(last.x, last.y, size.x, size.y);
 
-							qtree.queryInRange(range, found);
+							qtree.query_in_range(range, found);
 
 							if (!found.length) return;
 
@@ -186,9 +187,9 @@
 
 							break;
 						case 'resize':
-							if (!ptrDirection) return;
+							if (!ptr_direction) return;
 
-							gizmo.adjust(ptrDirection, last, mouse);
+							gizmo.adjust(ptr_direction, last, mouse);
 
 							break;
 						case 'move':
@@ -198,14 +199,14 @@
 						default:
 							cursor = qtree.has(mouse) ? 'move' : 'custom';
 
-							ptrDirection = gizmo.getHandleUnderCursor(mouse);
+							ptr_direction = gizmo.get_handle_under_cursor(mouse);
 
-							if (ptrDirection) {
-								cursor = directions[ptrDirection];
+							if (ptr_direction) {
+								cursor = directions[ptr_direction];
 								return;
 							}
 
-							if (gizmo.intersectsRotationPivot(mouse)) {
+							if (gizmo.intersects_rotate_handle(mouse)) {
 								cursor = 'grab';
 								return;
 							}
@@ -217,6 +218,14 @@
 
 							break;
 					}
+
+				case 'segment':
+					if (!shape) return;
+
+					shape.resize(mouse.x, mouse.y);
+					shape.draw(ctx, rough);
+
+					break;
 				case 'rectangle':
 				case 'ellipse':
 				case 'segment':
@@ -232,7 +241,7 @@
 			}
 		});
 
-		renderScene(ctx, rough, gizmo);
+		render_scene(ctx, rough, gizmo);
 	}
 
 	function onpointerup() {
@@ -253,7 +262,7 @@
 
 		gizmo.add([shape]);
 
-		renderScene(ctx, rough, gizmo);
+		render_scene(ctx, rough, gizmo);
 
 		shape = null;
 	}
@@ -274,7 +283,7 @@
 		crispify();
 		redraw(ctx, rough);
 
-		gizmo.draw(ctx);
+		gizmo.draw(ctx, rough);
 	}
 
 	function config() {
