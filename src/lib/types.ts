@@ -44,7 +44,16 @@ export interface BoundingBox {
 	get_handle_under_cursor(v: Vector): any;
 }
 
-export type Cursor = 'custom' | 'crosshair' | 'move' | 'ew' | 'nwse' | 'nesw' | 'ns' | 'grab';
+export type Cursor =
+	| 'custom'
+	| 'crosshair'
+	| 'move'
+	| 'ew'
+	| 'nwse'
+	| 'nesw'
+	| 'ns'
+	| 'grab'
+	| 'pointer';
 
 export type Direction =
 	| 'west'

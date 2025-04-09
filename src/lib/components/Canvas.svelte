@@ -17,7 +17,9 @@
 		'south-west': 'nesw',
 		'south-east': 'nwse',
 		'nor-west': 'nwse',
-		'nor-east': 'nesw'
+		'nor-east': 'nesw',
+		start: 'pointer',
+		end: 'pointer'
 	};
 
 	const cursors: Record<Cursor, string> = {
@@ -28,7 +30,8 @@
 		ns: 'cursor-ns-resize',
 		nesw: 'cursor-nesw-resize',
 		nwse: 'cursor-nwse-resize',
-		custom: 'cursor-custom'
+		custom: 'cursor-custom',
+		pointer: 'cursor-pointer'
 	} as const;
 
 	type Props = {
