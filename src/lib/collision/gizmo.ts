@@ -1,22 +1,23 @@
-import type { Direction, DrawOptions, GizmoHistoryEntry, Shape } from '$lib/types';
+import type { BoundingBox, Direction, DrawOptions, GizmoHistoryEntry, Shape } from '$lib/types';
 import { Vector } from '$lib/math/vector';
-import { BoundingBox } from './bounding-box';
+
 import {
-	calculateScaleFactor,
-	calculateScaledDimensions,
-	isDistanceClose,
-	projectPointOnSegment
+	calculate_scale_factor,
+	calculate_scaled_dimensions,
+	create_rectangular_bounding_box,
+	is_distance_close,
+	project_point_on_segment
 } from '$lib/util/util';
+import type { RoughCanvas } from 'roughjs/bin/canvas';
+import { RectangularBoundingBox } from './rectangular-bounding-box';
+import create from '$lib/shape-factory';
 
 const OFFSET = 12;
-
-const CORNERS: Direction[] = ['nor-west', 'south-west', 'south-east', 'nor-east'];
-const EDGES: Direction[] = ['north', 'south', 'west', 'east'];
 
 export class Gizmo {
 	targets: Shape[] = [];
 
-	boundary: BoundingBox = new BoundingBox();
+	boundary: BoundingBox = new RectangularBoundingBox();
 
 	angle: number = 0;
 
@@ -28,7 +29,11 @@ export class Gizmo {
 		this.targets.forEach((target) => {
 			this.history.set(target.id, {
 				center: this.center,
-				vertices: target.vertices,
+				vertices: [
+					target.vertices[0],
+					// temporary fix for segment
+					target.type === 'segment' ? target.vertices[1] : target.vertices[2]
+				],
 				displacement: target.center.substract(this.center),
 				angle: target.angle
 			});
@@ -37,7 +42,10 @@ export class Gizmo {
 
 	add(found: Shape[]) {
 		this.targets = found;
-		this.boundary.update(found);
+
+		if (!this.targets.length) return;
+
+		this.boundary = create_rectangular_bounding_box(this.targets);
 
 		if (found.length > 1) {
 			this.angle = 0;
@@ -46,6 +54,7 @@ export class Gizmo {
 
 		const [target] = this.targets;
 		this.angle = target.angle;
+		this.boundary = target.AABB;
 	}
 
 	get center(): Vector {
@@ -54,72 +63,35 @@ export class Gizmo {
 
 	clear() {
 		this.history.clear();
+		this.targets.forEach((target) => (target.selected = false));
 		this.targets = [];
-		this.boundary.reset();
-	}
-
-	contains(v: Vector): boolean {
-		const boundary = this.boundary;
-		const center = boundary.center;
-
-		const p = v.rotate(center.x, center.y, -this.angle);
-
-		return (
-			p.x >= boundary.x + OFFSET &&
-			p.x <= boundary.x + boundary.width - OFFSET &&
-			p.y >= boundary.y + OFFSET &&
-			p.y <= boundary.y + boundary.height - OFFSET
-		);
-	}
-
-	intersects(v: Vector) {
-		const boundary = this.boundary;
-		const center = boundary.center;
-
-		const p = v.rotate(center.x, center.y, -this.angle);
-
-		return !(
-			p.x < boundary.x - OFFSET * 2 ||
-			p.x > boundary.x + boundary.width + OFFSET * 2 ||
-			p.y < boundary.y - OFFSET * 2 ||
-			p.y > boundary.y + boundary.height + OFFSET * 2
-		);
+		this.boundary.clear();
 	}
 
 	offset(v: Vector) {
 		this.targets.forEach((target) => {
 			const nw = target.vertices[0];
-			target.offset.set(v.x - nw.x, v.y - nw.y);
+			const offset = v.substract(nw);
+			target.offset.set(offset.x, offset.y);
 		});
 	}
 
+	contains(v: Vector): boolean {
+		return this.boundary.contains(v);
+	}
+
+	intersects(v: Vector): boolean {
+		return this.boundary.intersects(v);
+	}
+
+	intersects_rotate_handle(v: Vector) {
+		return this.boundary.intersects_rotate_handle(v);
+	}
+
 	rotate(angle: number) {
-		if (this.targets.length > 1) {
-			this.targets.forEach((target) => {
-				const history = this.history.get(target.id);
+		if (!this.targets.length) return;
 
-				if (!history) return;
-
-				const displacement = history.displacement;
-				const center = history.center;
-				const vertices = history.vertices;
-
-				const width = Math.abs(vertices[0].x - vertices[2].x);
-				const height = Math.abs(vertices[0].y - vertices[2].y);
-
-				const cos = Math.cos(angle);
-				const sin = Math.sin(angle);
-
-				const pos = Vector.from(
-					center.x + cos * displacement.x - sin * displacement.y - width / 2,
-					center.y + sin * displacement.x + cos * displacement.y - height / 2
-				);
-
-				target.move(pos);
-
-				target.angle = history.angle + angle;
-			});
-		} else {
+		if (this.targets.length === 1) {
 			const [target] = this.targets;
 
 			const history = this.history.get(target.id);
@@ -127,14 +99,45 @@ export class Gizmo {
 			if (!history) return;
 
 			target.rotate(history.angle + angle);
-			this.angle = target.angle;
+
+			this.boundary = target.AABB;
+
+			return;
 		}
 
-		this.boundary.update(this.targets);
+		this.targets.forEach((target) => {
+			const history = this.history.get(target.id);
+
+			if (!history) return;
+
+			const displacement = history.displacement;
+			const center = history.center;
+			const vertices = history.vertices;
+
+			const width = Math.abs(vertices[0].x - vertices[1].x);
+			const height = Math.abs(vertices[0].y - vertices[1].y);
+
+			const cos = Math.cos(angle);
+			const sin = Math.sin(angle);
+
+			const pos = Vector.from(
+				center.x + cos * displacement.x - sin * displacement.y - width / 2,
+				center.y + sin * displacement.x + cos * displacement.y - height / 2
+			);
+
+			target.move(pos);
+			target.rotate(history.angle + angle);
+		});
+
+		this.boundary = create_rectangular_bounding_box(this.targets);
 	}
 
-	adjust(direction: Direction, previous: Vector, current: Vector) {
-		const keepAspectRatio = this.targets.some((target) => target.angle !== 0);
+	get_handle_under_cursor(v: Vector): Direction | null {
+		return this.boundary.get_handle_under_cursor(v);
+	}
+
+	adjust(direction: Direction, prev_mouse: Vector, mouse: Vector) {
+		const keep_aspect_ratio = this.targets.some((target) => target.angle !== 0);
 
 		// TODO: we should refactor this to make a little better. Later we do it.
 
@@ -144,9 +147,9 @@ export class Gizmo {
 
 				if (!history) return;
 
-				const [nw, _, se] = history.vertices;
+				const [nw, se] = history.vertices;
 
-				const factor = calculateScaleFactor(current, previous, this.anchor);
+				const factor = calculate_scale_factor(mouse, prev_mouse, this.anchor);
 
 				let scale = Math.max(factor.x, factor.y);
 
@@ -155,7 +158,7 @@ export class Gizmo {
 				let width: number;
 				let height: number;
 
-				if (keepAspectRatio) {
+				if (keep_aspect_ratio) {
 					if (direction === 'east' || direction === 'west') {
 						scale = factor.x;
 					}
@@ -164,7 +167,7 @@ export class Gizmo {
 						scale = factor.y;
 					}
 
-					const dimensions = calculateScaledDimensions(
+					const dimensions = calculate_scaled_dimensions(
 						nw,
 						se,
 						this.anchor,
@@ -187,7 +190,7 @@ export class Gizmo {
 					return;
 				}
 
-				const dimensions = calculateScaledDimensions(nw, se, this.anchor, factor);
+				const dimensions = calculate_scaled_dimensions(nw, se, this.anchor, factor);
 
 				x = dimensions.x;
 				y = dimensions.y;
@@ -197,12 +200,24 @@ export class Gizmo {
 				switch (direction) {
 					case 'east':
 					case 'west':
+						if (target.type === 'segment') {
+							target.x = (nw.x - this.anchor.x) * factor.x + this.anchor.x;
+							target.x1 = (se.x - this.anchor.x) * factor.x + this.anchor.x;
+							return;
+						}
+
 						target.move(Vector.from(x, nw.y));
 						target.resize(width, se.y - nw.y);
 						break;
 
 					case 'north':
 					case 'south':
+						if (target.type === 'segment') {
+							target.y = (nw.y - this.anchor.y) * factor.y + this.anchor.y;
+							target.y1 = (se.y - this.anchor.y) * factor.y + this.anchor.y;
+							return;
+						}
+
 						target.move(Vector.from(nw.x, y));
 						target.resize(se.x - nw.x, height);
 						break;
@@ -211,6 +226,21 @@ export class Gizmo {
 					case 'nor-east':
 					case 'south-west':
 					case 'south-east':
+						if (target.type === 'segment') {
+							const x = (nw.x - this.anchor.x) * factor.x + this.anchor.x;
+							const y = (nw.y - this.anchor.y) * factor.y + this.anchor.y;
+							const x1 = (se.x - this.anchor.x) * factor.x + this.anchor.x;
+							const y1 = (se.y - this.anchor.y) * factor.y + this.anchor.y;
+
+							target.move(Vector.from(x, y));
+
+							target.x = x;
+							target.y = y;
+							target.x1 = x1;
+							target.y1 = y1;
+							return;
+						}
+
 						target.move(Vector.from(x, y));
 						target.resize(width, height);
 
@@ -219,66 +249,76 @@ export class Gizmo {
 
 				target.normalize();
 			});
-		} else {
-			const [target] = this.targets;
-			target.adjust(direction, current);
+
+			this.boundary = create_rectangular_bounding_box(this.targets);
+
+			return;
 		}
 
-		this.boundary.update(this.targets);
+		const [target] = this.targets;
+		target.adjust(direction, mouse);
+		this.boundary = target.AABB;
 	}
 
 	move(mouse: Vector) {
-		this.targets.forEach((target) => {
-			target.move(mouse.substract(target.offset));
-		});
+		if (this.targets.length > 1) {
+			this.targets.forEach((target) => {
+				target.move(mouse.substract(target.offset));
+			});
 
-		this.boundary.update(this.targets);
-	}
+			this.boundary = create_rectangular_bounding_box(this.targets);
 
-	intersectsRotationPivot(v: Vector) {
-		const pivot = Vector.from(this.boundary.center.x, this.boundary.y - 40);
+			return;
+		}
 
-		const unrotated = v.rotate(this.boundary.center.x, this.boundary.center.y, -this.angle);
-
-		return isDistanceClose(pivot, unrotated, 20);
+		const [target] = this.targets;
+		target.move(mouse.substract(target.offset));
+		this.boundary = target.AABB;
 	}
 
 	normalize() {
 		this.targets.forEach((target) => target.normalize());
 	}
 
-	setAnchor(v: Vector) {
-		const boundary = this.boundary;
+	set_anchor(v: Vector) {
+		if (this.targets.length < 2) return;
 
-		const side = this.getHandleUnderCursor(v);
+		const [nw, , se] = this.boundary.vertices;
 
-		const keepAspectRatio = this.targets.some((target) => target.angle !== 0);
+		const x = nw.x;
+		const y = nw.y;
+		const width = se.x - nw.x;
+		const height = se.y - nw.y;
 
-		if (!keepAspectRatio) {
+		const side = this.boundary.get_handle_under_cursor(v);
+
+		const keep_aspect_ratio = this.targets.some((target) => target.angle !== 0);
+
+		if (!keep_aspect_ratio) {
 			switch (side) {
 				case 'east':
-					this.anchor.set(boundary.x, boundary.y);
+					this.anchor.set(x, y);
 					break;
 				case 'west':
-					this.anchor.set(boundary.x + boundary.width, boundary.y);
+					this.anchor.set(x + width, y);
 					break;
 				case 'south':
-					this.anchor.set(boundary.x, boundary.y);
+					this.anchor.set(x, y);
 					break;
 				case 'north':
-					this.anchor.set(boundary.x, boundary.y + boundary.height);
+					this.anchor.set(x, y + height);
 					break;
 				case 'south-east':
-					this.anchor.set(boundary.x, boundary.y);
+					this.anchor.set(x, y);
 					break;
 				case 'south-west':
-					this.anchor.set(boundary.x + boundary.width, boundary.y);
+					this.anchor.set(x + width, y);
 					break;
 				case 'nor-west':
-					this.anchor.set(boundary.x + boundary.width, boundary.y + boundary.height);
+					this.anchor.set(x + width, y + height);
 					break;
 				case 'nor-east':
-					this.anchor.set(boundary.x, boundary.y + boundary.height);
+					this.anchor.set(x, y + height);
 					break;
 			}
 
@@ -287,75 +327,41 @@ export class Gizmo {
 
 		switch (side) {
 			case 'south-west':
-				this.anchor.set(boundary.x + boundary.width, boundary.y);
+				this.anchor.set(x + width, y);
 				break;
 			case 'nor-west':
-				this.anchor.set(boundary.x + boundary.width, boundary.y + boundary.height);
+				this.anchor.set(x + width, y + height);
 				break;
 			case 'nor-east':
-				this.anchor.set(boundary.x, boundary.y + boundary.height);
+				this.anchor.set(x, y + height);
 				break;
 			case 'south-east':
-				this.anchor.set(boundary.x, boundary.y);
+				this.anchor.set(x, y);
 				break;
 			case 'east':
-				this.anchor.set(boundary.x, boundary.y + boundary.height / 2);
+				this.anchor.set(x, y + height / 2);
 				break;
 			case 'west':
-				this.anchor.set(boundary.x + boundary.width, boundary.y + boundary.height / 2);
+				this.anchor.set(x + width, y + height / 2);
 				break;
 			case 'north':
-				this.anchor.set(boundary.x + boundary.width / 2, boundary.y + boundary.height);
+				this.anchor.set(x + width / 2, y + height);
 				break;
 			case 'south':
-				this.anchor.set(boundary.x + boundary.width / 2, boundary.y);
+				this.anchor.set(x + width / 2, y);
 				break;
 		}
 	}
 
-	getHandleUnderCursor(v: Vector): Direction | null {
-		const center = this.boundary.center;
-
-		const unrotated = v.rotate(center.x, center.y, -this.angle);
-
-		const vertices = this.boundary.vertices;
-
-		const threeshold = 20;
-
-		for (let i = 0; i < vertices.length; i++) {
-			const vertice = vertices[i];
-
-			if (isDistanceClose(vertice, unrotated, threeshold)) {
-				return CORNERS[i];
-			}
+	draw(c: CanvasRenderingContext2D, r: RoughCanvas) {
+		if (this.targets.length > 1) {
+			this.boundary.draw(c);
+			return;
 		}
 
-		const [nw, sw, se, ne] = vertices;
-
-		const segments: Vector[][] = [
-			[nw, ne],
-			[sw, se],
-			[nw, sw],
-			[ne, se]
-		];
-
-		for (let i = 0; i < segments.length; i++) {
-			const [a, b] = segments[i];
-
-			const p = projectPointOnSegment(unrotated, a, b);
-
-			if (isDistanceClose(p, unrotated, threeshold)) {
-				return EDGES[i];
-			}
-		}
-
-		return null;
-	}
-
-	draw(c: CanvasRenderingContext2D) {
-		c.save();
-		this.boundary.draw(c, this.angle);
-		c.restore();
+		const [target] = this.targets;
+		target.draw(c, r);
+		target.AABB.draw(c);
 	}
 
 	get empty(): boolean {
