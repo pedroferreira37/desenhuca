@@ -153,11 +153,6 @@ export class Gizmo {
 
 				let scale = Math.max(factor.x, factor.y);
 
-				let x: number;
-				let y: number;
-				let width: number;
-				let height: number;
-
 				if (keep_aspect_ratio) {
 					if (direction === 'east' || direction === 'west') {
 						scale = factor.x;
@@ -177,10 +172,23 @@ export class Gizmo {
                         */
 					);
 
-					x = dimensions.x;
-					y = dimensions.y;
-					width = dimensions.width;
-					height = dimensions.height;
+					const x = dimensions.x;
+					const y = dimensions.y;
+					const width = dimensions.width;
+					const height = dimensions.height;
+
+					if (target.type === 'segment') {
+						const x = (nw.x - this.anchor.x) * scale + this.anchor.x;
+						const y = (nw.y - this.anchor.y) * scale + this.anchor.y;
+						const x1 = (se.x - this.anchor.x) * scale + this.anchor.x;
+						const y1 = (se.y - this.anchor.y) * scale + this.anchor.y;
+
+						target.x = x;
+						target.y = y;
+						target.x1 = x1;
+						target.y1 = y1;
+						return;
+					}
 
 					const pos = Vector.from(x, y);
 
@@ -192,10 +200,10 @@ export class Gizmo {
 
 				const dimensions = calculate_scaled_dimensions(nw, se, this.anchor, factor);
 
-				x = dimensions.x;
-				y = dimensions.y;
-				width = dimensions.width;
-				height = dimensions.height;
+				const x = dimensions.x;
+				const y = dimensions.y;
+				const width = dimensions.width;
+				const height = dimensions.height;
 
 				switch (direction) {
 					case 'east':
@@ -231,8 +239,6 @@ export class Gizmo {
 							const y = (nw.y - this.anchor.y) * factor.y + this.anchor.y;
 							const x1 = (se.x - this.anchor.x) * factor.x + this.anchor.x;
 							const y1 = (se.y - this.anchor.y) * factor.y + this.anchor.y;
-
-							target.move(Vector.from(x, y));
 
 							target.x = x;
 							target.y = y;
