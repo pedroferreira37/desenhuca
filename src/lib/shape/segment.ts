@@ -57,8 +57,6 @@ export class Segment implements Shape {
 			Vector.from(this.x1, this.y1)
 		);
 
-		console.log(is_distance_close(p, b, 16));
-
 		return is_distance_close(p, b, 16);
 	}
 
