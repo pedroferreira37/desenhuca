@@ -1,7 +1,7 @@
 import { RectangularBoundingBox } from '$lib/collision/rectangular-bounding-box';
 import { Vector } from '$lib/math/vector';
-import type { BoundingBox, Direction, DrawOptions, Shape } from '$lib/types';
-import { uuid } from '$lib/util/util';
+import type { BoundingBox, Handle, DrawOptions, Shape, ResizeReference } from '$lib/types';
+import { get_scaled_points_based_on_group_resize_ctx, uuid } from '$lib/util/util';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 import type { Options } from 'roughjs/bin/core';
 
@@ -14,7 +14,9 @@ export class Ellipse implements Shape {
 
 	public angle: number = 0;
 
-	public reference: Vector[] = [];
+	public history: ResizeReference | null = null;
+
+	public anchor: Vector = Vector.zero();
 
 	constructor(
 		private x: number = 0,
@@ -29,8 +31,38 @@ export class Ellipse implements Shape {
 		this.y = v.y;
 	}
 
+	save(entry: ResizeReference) {
+		this.history = entry;
+	}
+
+	resize_as_group_context(handle: Handle, factor: Vector) {
+		const history = this.history;
+
+		if (!history) return;
+
+		const [nw, se] = history.vertices;
+
+		const [x, y, width, height] = get_scaled_points_based_on_group_resize_ctx(
+			this.type,
+			handle,
+			nw,
+			se,
+			this.anchor,
+			factor
+		);
+
+		this.x = x;
+		this.y = y;
+		this.width = width;
+		this.height = height;
+	}
+
 	rotate(angle: number) {
-		this.angle = angle;
+		const history = this.history;
+
+		if (!history) return;
+
+		this.angle = history.angle + angle;
 	}
 
 	intersects(v: Vector): boolean {
@@ -61,12 +93,12 @@ export class Ellipse implements Shape {
 		this.height = height;
 	}
 
-	adjust(direction: Direction, mouse: Vector) {
+	adjust(handle: Handle, mouse: Vector) {
 		const c = mouse;
 
 		const [nw, sw, se, ne] = this.vertices;
 
-		switch (direction) {
+		switch (handle) {
 			case 'south-west': {
 				const ne = Vector.from(this.x + this.width, this.y).rotate(
 					this.center.x,

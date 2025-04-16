@@ -1,5 +1,5 @@
 import { RectangularBoundingBox } from '$lib/collision/rectangular-bounding-box';
-import type { BoundingBox, Direction, Shape, Tool } from '$lib/types';
+import type { BoundingBox, Handle, Shape, ShapeType, Tool } from '$lib/types';
 import { Vector } from '../math/vector';
 
 const shortcuts: Tool[] = ['pointer', 'pencil', 'rectangle', 'ellipse', 'segment', 'eraser'];
@@ -25,25 +25,95 @@ export function is_distance_close(a: Vector, b: Vector, threshold: number) {
 	return dx * dx + dy * dy < threshold * threshold;
 }
 
-export function calculate_scaled_dimensions(nw: Vector, se: Vector, anchor: Vector, ratio: Vector) {
+export function get_scaled_points_based_on_group_resize_ctx(
+	type: ShapeType,
+	handle: Handle,
+	nw: Vector,
+	se: Vector,
+	anchor: Vector,
+	ratio: Vector,
+	keep_aspect_ratio: boolean = false
+): number[] {
 	const x = (nw.x - anchor.x) * ratio.x + anchor.x;
 	const y = (nw.y - anchor.y) * ratio.y + anchor.y;
 	const width = (se.x - nw.x) * ratio.x;
 	const height = (se.y - nw.y) * ratio.y;
 
-	return {
-		x,
-		y,
-		width,
-		height
-	};
+	if (keep_aspect_ratio) {
+		return [x, y, width, height];
+	}
+
+	switch (handle) {
+		case 'east':
+		case 'west':
+			if (type === 'segment') {
+				return [
+					(nw.x - anchor.x) * ratio.x + anchor.x,
+					nw.y,
+					(se.x - anchor.x) * ratio.x + anchor.x,
+					se.y
+				];
+			}
+
+			return [x, nw.y, width, se.y - nw.y];
+
+		case 'north':
+		case 'south':
+			if (type === 'segment') {
+				return [
+					nw.x,
+					(nw.y - anchor.y) * ratio.y + anchor.y,
+					se.x,
+					(se.y - nw.y) * ratio.y + anchor.y
+				];
+			}
+
+			return [nw.x, y, se.x - nw.x, height];
+
+		case 'nor-west':
+		case 'nor-east':
+		case 'south-west':
+		case 'south-east':
+			if (type === 'segment') {
+				const x = (nw.x - anchor.x) * ratio.x + anchor.x;
+				const y = (nw.y - anchor.y) * ratio.y + anchor.y;
+				const x1 = (se.x - anchor.x) * ratio.x + anchor.x;
+				const y1 = (se.y - anchor.y) * ratio.y + anchor.y;
+
+				return [x, y, x1, y1];
+			}
+
+			return [x, y, width, height];
+		default:
+			return [x, y, width, height];
+	}
 }
 
-export function calculate_scale_factor(current: Vector, previous: Vector, anchor: Vector) {
-	const currentOfsset = current.substract(anchor);
-	const previousOffset = previous.substract(anchor);
+export function get_scale_factor(
+	handle: Handle,
+	current: Vector,
+	previous: Vector,
+	anchor: Vector,
+	keep_aspect_ratio: boolean = false
+) {
+	const cur_offset = current.substract(anchor);
+	const prev_offset = previous.substract(anchor);
 
-	return Vector.from(currentOfsset.x / previousOffset.x, currentOfsset.y / previousOffset.y);
+	const factor = Vector.from(cur_offset.x / prev_offset.x, cur_offset.y / prev_offset.y);
+
+	if (!keep_aspect_ratio) return factor;
+
+	let scale = Math.max(factor.x, factor.y);
+
+	if (handle === 'west' || handle === 'east') {
+		scale = factor.x;
+	}
+
+	if (handle === 'north' || handle === 'south') {
+		scale = factor.y;
+	}
+
+	return Vector.from(scale, scale);
 }
 
 export function retrieve_tool_by_shortcut(key: string): Tool | null {
@@ -101,27 +171,4 @@ export function circle(
 	c.arc(x, y, radius, 0, 2 * Math.PI);
 	c.fill();
 	c.closePath();
-}
-
-export function create_rectangular_bounding_box(entries: Shape[]): BoundingBox {
-	let xmin = Infinity;
-	let xmax = -Infinity;
-	let ymin = Infinity;
-	let ymax = -Infinity;
-
-	entries.forEach((entry) => {
-		const vertices =
-			entry.angle !== 0
-				? entry.vertices.map((vertex) => vertex.rotate(entry.center.x, entry.center.y, entry.angle))
-				: entry.vertices;
-
-		vertices.forEach((vertex) => {
-			xmax = Math.max(xmax, vertex.x);
-			xmin = Math.min(xmin, vertex.x);
-			ymin = Math.min(ymin, vertex.y);
-			ymax = Math.max(ymax, vertex.y);
-		});
-	});
-
-	return new RectangularBoundingBox(xmin, ymin, xmax, ymax, 0);
 }

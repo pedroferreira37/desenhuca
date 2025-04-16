@@ -3,13 +3,13 @@
 	import { QuadTree } from '$lib/collision/qtree';
 	import { Gizmo } from '$lib/collision/gizmo';
 	import { AABB } from '$lib/collision/aabb';
-	import type { Shape, Tool, Cursor, PointerMode, Direction } from '$lib/types';
+	import type { Shape, Tool, Cursor, PointerMode, Handle } from '$lib/types';
 	import roughCanvas from 'roughjs';
 	import { RoughCanvas } from 'roughjs/bin/canvas';
 	import type { Options } from 'roughjs/bin/core';
-	import create from '$lib/shape-factory';
+	import create_shape from '$lib/shape-factory';
 
-	const directions: Record<Direction, Cursor> = {
+	const directions: Record<Handle, Cursor> = {
 		west: 'ew',
 		east: 'ew',
 		north: 'ns',
@@ -75,7 +75,7 @@
 
 	let gizmo: Gizmo = new Gizmo();
 
-	let ptr_direction: Direction | null = null;
+	let ptr_direction: Handle | null = null;
 
 	let base_options = $state<Options>({
 		seed: 4,
@@ -154,7 +154,7 @@
 
 				draw();
 
-				shape = create(tool, last.x, last.y, 0, 0, base_options);
+				shape = create_shape(tool, last.x, last.y, 0, 0, base_options);
 
 				break;
 		}
@@ -169,9 +169,7 @@
 					switch (mode) {
 						case 'select':
 							const found: Shape[] = [];
-
 							const size = mouse.substract(last);
-
 							const range = new AABB(last.x, last.y, size.x, size.y);
 
 							qtree.query_in_range(range, found);
@@ -179,7 +177,6 @@
 							if (!found.length) return;
 
 							gizmo.add(found);
-
 							break;
 						case 'rotate':
 							const angle =
@@ -187,21 +184,17 @@
 								Math.atan2(last.y - gizmo.center.y, last.x - gizmo.center.x);
 
 							gizmo.rotate(angle);
-
 							break;
 						case 'resize':
 							if (!ptr_direction) return;
 
 							gizmo.adjust(ptr_direction, last, mouse);
-
 							break;
 						case 'move':
 							gizmo.move(mouse);
-
 							break;
 						default:
 							cursor = qtree.has(mouse) ? 'move' : 'custom';
-
 							ptr_direction = gizmo.get_handle_under_cursor(mouse);
 
 							if (ptr_direction) {
@@ -227,7 +220,6 @@
 
 					shape.resize(mouse.x, mouse.y);
 					shape.draw(ctx, rough);
-
 					break;
 				case 'rectangle':
 				case 'ellipse':
@@ -239,7 +231,6 @@
 
 					shape.resize(size.x, size.y);
 					shape.draw(ctx, rough);
-
 					break;
 			}
 		});
@@ -282,11 +273,11 @@
 		canvas.style.height = `${rect.height}px`;
 	}
 
-	function windowResize() {
+	function window_resize() {
 		crispify();
 		redraw(ctx, rough);
 
-		gizmo.draw(ctx, rough);
+		if (gizmo) gizmo.draw(ctx, rough);
 	}
 
 	function config() {
@@ -298,12 +289,12 @@
 		const boundary = new AABB(0, 0, canvas.width, canvas.height);
 		qtree = new QuadTree(boundary, 4);
 
-		window.addEventListener('resize', windowResize);
-		document.addEventListener('visibilitychange', windowResize);
+		window.addEventListener('resize', window_resize);
+		document.addEventListener('visibilitychange', window_resize);
 
 		return () => {
-			window.removeEventListener('resize', windowResize);
-			document.removeEventListener('visibilitychange', windowResize);
+			window.removeEventListener('resize', window_resize);
+			document.removeEventListener('visibilitychange', window_resize);
 		};
 	}
 

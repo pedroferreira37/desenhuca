@@ -1,17 +1,28 @@
 import { LineBoundingBox } from '$lib/collision/line-bounding-box';
 import { Vector } from '$lib/math/vector';
-import type { BoundingBox, Direction, DrawOptions, Shape } from '$lib/types';
-import { is_distance_close, project_point_on_segment, uuid } from '$lib/util/util';
+import type { BoundingBox, Handle, DrawOptions, Shape, ResizeReference } from '$lib/types';
+import {
+	get_scaled_points_based_on_group_resize_ctx,
+	is_distance_close,
+	project_point_on_segment,
+	uuid
+} from '$lib/util/util';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 
 const PADDING = 16;
 
 export class Segment implements Shape {
 	public id: string = uuid();
+
 	public type: 'segment' = 'segment';
+
 	public offset: Vector = Vector.zero();
+
 	public angle: number = 0;
-	public reference: Vector[] = [];
+
+	public anchor: Vector = Vector.zero();
+
+	public history: ResizeReference | null = null;
 
 	constructor(
 		private x: number = 0,
@@ -31,8 +42,38 @@ export class Segment implements Shape {
 		this.y1 += dy;
 	}
 
+	save(entry: ResizeReference) {
+		this.history = entry;
+	}
+
+	resize_as_group_context(handle: Handle, factor: Vector) {
+		const history = this.history;
+
+		if (!history) return;
+
+		const [nw, se] = history.vertices;
+
+		const [x, y, x1, y1] = get_scaled_points_based_on_group_resize_ctx(
+			this.type,
+			handle,
+			nw,
+			se,
+			this.anchor,
+			factor
+		);
+
+		this.x = x;
+		this.y = y;
+		this.x1 = x1;
+		this.y1 = y1;
+	}
+
 	rotate(angle: number) {
-		this.angle = angle;
+		const history = this.history;
+
+		if (!history) return;
+
+		this.angle = history.angle + angle;
 	}
 
 	intersects(v: Vector): boolean {
@@ -68,13 +109,13 @@ export class Segment implements Shape {
 		this.y1 = y1;
 	}
 
-	adjust(direction: Direction, mouse: Vector) {
+	adjust(handle: Handle, mouse: Vector) {
 		const c = mouse;
 		// Why I did this?
 
 		const [nw, sw, se, ne] = this.vertices;
 
-		switch (direction) {
+		switch (handle) {
 			case 'start': {
 				const end = Vector.from(this.x1, this.y1).rotate(this.center.x, this.center.y, this.angle);
 
@@ -108,7 +149,7 @@ export class Segment implements Shape {
 
 		return;
 
-		switch (direction) {
+		switch (handle) {
 			case 'south-west': {
 				const ne = Vector.from(this.x + this.x1, this.y).rotate(
 					this.center.x,

@@ -1,5 +1,5 @@
 import { Vector } from '$lib/math/vector';
-import type { BoundingBox, Direction } from '$lib/types';
+import type { BoundingBox, Handle } from '$lib/types';
 import { is_distance_close, project_point_on_segment } from '$lib/util/util';
 
 export class LineBoundingBox implements BoundingBox {

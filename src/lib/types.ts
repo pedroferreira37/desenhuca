@@ -4,35 +4,41 @@ import type { RoughCanvas } from 'roughjs/bin/canvas';
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'segment';
 
-export type GizmoHistoryEntry = {
-	center: Vector;
-	vertices: Vector[];
-	displacement: Vector;
-	angle: number;
-};
-
 export interface Shape {
 	id: string;
 	type: ShapeType;
 	vertices: Vector[];
-	reference: Vector[];
+	history: ResizeReference | null;
 	offset: Vector;
 	angle: number;
 	center: Vector;
-	selected: boolean;
 	AABB: BoundingBox;
+	anchor: Vector;
+	save(entry: ResizeReference): void;
 	move(v: Vector): void;
 	intersects(v: Vector): boolean;
 	contains(v: Vector): boolean;
 	resize(x: number, y: number, x1?: number, y1?: number): void;
-	adjust(direction: Direction, mouse: Vector): void;
+	resize_as_group_context(handle: Handle, factor: Vector, keep_aspect_ratio: boolean): void;
+	adjust(handle: Handle, mouse: Vector): void;
 	rotate(angle: number): void;
 	customize(options: Options): void;
 	draw(context: CanvasRenderingContext2D, rough: RoughCanvas): void;
 	normalize(): void;
 }
 
+export interface ResizeReference {
+	center: Vector;
+	vertices: Vector[];
+	displacement: Vector;
+	angle: number;
+}
+
 export interface BoundingBox {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
 	angle: number;
 	center: Vector;
 	vertices: Vector[];
@@ -55,7 +61,7 @@ export type Cursor =
 	| 'grab'
 	| 'pointer';
 
-export type Direction =
+export type Handle =
 	| 'west'
 	| 'east'
 	| 'north'

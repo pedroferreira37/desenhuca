@@ -3,7 +3,7 @@ import { Ellipse } from './shape/ellipse';
 import { Rectangle } from './shape/rectangle';
 import { Segment } from './shape/segment';
 
-export default function create(
+export default function create_shape(
 	type: ShapeType,
 	x: number,
 	y: number,
