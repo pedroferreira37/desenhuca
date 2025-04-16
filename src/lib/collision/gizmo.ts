@@ -1,18 +1,9 @@
-import type { BoundingBox, Direction, DrawOptions, GizmoHistoryEntry, Shape } from '$lib/types';
+import type { BoundingBox, Handle, DrawOptions, Shape } from '$lib/types';
 import { Vector } from '$lib/math/vector';
 
-import {
-	calculate_scale_factor,
-	calculate_scaled_dimensions,
-	create_rectangular_bounding_box,
-	is_distance_close,
-	project_point_on_segment
-} from '$lib/util/util';
+import { get_scale_factor, is_distance_close, project_point_on_segment } from '$lib/util/util';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 import { RectangularBoundingBox } from './rectangular-bounding-box';
-import create from '$lib/shape-factory';
-
-const OFFSET = 12;
 
 export class Gizmo {
 	targets: Shape[] = [];
@@ -23,19 +14,17 @@ export class Gizmo {
 
 	anchor: Vector = Vector.zero();
 
-	history: Map<string, GizmoHistoryEntry> = new Map();
-
 	save() {
 		this.targets.forEach((target) => {
-			this.history.set(target.id, {
+			// Probably we will need to use save later, but we keep for now.
+			target.save({
 				center: this.center,
-				vertices: [
-					target.vertices[0],
-					// temporary fix for segment
-					target.type === 'segment' ? target.vertices[1] : target.vertices[2]
-				],
 				displacement: target.center.substract(this.center),
-				angle: target.angle
+				angle: target.angle,
+				vertices:
+					target.type === 'segment'
+						? [target.vertices[0], target.vertices[1]]
+						: [target.vertices[0], target.vertices[2]]
 			});
 		});
 	}
@@ -45,7 +34,7 @@ export class Gizmo {
 
 		if (!this.targets.length) return;
 
-		this.boundary = create_rectangular_bounding_box(this.targets);
+		this.boundary = RectangularBoundingBox.create(this.targets);
 
 		if (found.length > 1) {
 			this.angle = 0;
@@ -62,8 +51,6 @@ export class Gizmo {
 	}
 
 	clear() {
-		this.history.clear();
-		this.targets.forEach((target) => (target.selected = false));
 		this.targets = [];
 		this.boundary.clear();
 	}
@@ -94,11 +81,7 @@ export class Gizmo {
 		if (this.targets.length === 1) {
 			const [target] = this.targets;
 
-			const history = this.history.get(target.id);
-
-			if (!history) return;
-
-			target.rotate(history.angle + angle);
+			target.rotate(angle);
 
 			this.boundary = target.AABB;
 
@@ -106,7 +89,7 @@ export class Gizmo {
 		}
 
 		this.targets.forEach((target) => {
-			const history = this.history.get(target.id);
+			const history = target.history;
 
 			if (!history) return;
 
@@ -126,143 +109,40 @@ export class Gizmo {
 			);
 
 			target.move(pos);
-			target.rotate(history.angle + angle);
+			target.rotate(angle);
 		});
 
-		this.boundary = create_rectangular_bounding_box(this.targets);
+		this.boundary = RectangularBoundingBox.create(this.targets);
 	}
 
-	get_handle_under_cursor(v: Vector): Direction | null {
+	get_handle_under_cursor(v: Vector): Handle | null {
 		return this.boundary.get_handle_under_cursor(v);
 	}
 
-	adjust(direction: Direction, prev_mouse: Vector, mouse: Vector) {
+	adjust(handle: Handle, prev_mouse: Vector, mouse: Vector) {
 		const keep_aspect_ratio = this.targets.some((target) => target.angle !== 0);
-
-		// TODO: we should refactor this to make a little better. Later we do it.
 
 		if (this.targets.length > 1) {
 			this.targets.forEach((target) => {
-				const history = this.history.get(target.id);
+				const factor = get_scale_factor(
+					handle,
+					mouse,
+					prev_mouse,
+					target.anchor,
+					keep_aspect_ratio
+				);
 
-				if (!history) return;
-
-				const [nw, se] = history.vertices;
-
-				const factor = calculate_scale_factor(mouse, prev_mouse, this.anchor);
-
-				let scale = Math.max(factor.x, factor.y);
-
-				if (keep_aspect_ratio) {
-					if (direction === 'east' || direction === 'west') {
-						scale = factor.x;
-					}
-
-					if (direction === 'north' || direction === 'south') {
-						scale = factor.y;
-					}
-
-					const dimensions = calculate_scaled_dimensions(
-						nw,
-						se,
-						this.anchor,
-						Vector.from(scale, scale)
-						/* We pass a new vector using the same scale for x and y
-                          because there are rotated elements in the gizmo.
-                        */
-					);
-
-					const x = dimensions.x;
-					const y = dimensions.y;
-					const width = dimensions.width;
-					const height = dimensions.height;
-
-					if (target.type === 'segment') {
-						const x = (nw.x - this.anchor.x) * scale + this.anchor.x;
-						const y = (nw.y - this.anchor.y) * scale + this.anchor.y;
-						const x1 = (se.x - this.anchor.x) * scale + this.anchor.x;
-						const y1 = (se.y - this.anchor.y) * scale + this.anchor.y;
-
-						target.x = x;
-						target.y = y;
-						target.x1 = x1;
-						target.y1 = y1;
-						return;
-					}
-
-					const pos = Vector.from(x, y);
-
-					target.move(pos);
-					target.resize(width, height);
-
-					return;
-				}
-
-				const dimensions = calculate_scaled_dimensions(nw, se, this.anchor, factor);
-
-				const x = dimensions.x;
-				const y = dimensions.y;
-				const width = dimensions.width;
-				const height = dimensions.height;
-
-				switch (direction) {
-					case 'east':
-					case 'west':
-						if (target.type === 'segment') {
-							target.x = (nw.x - this.anchor.x) * factor.x + this.anchor.x;
-							target.x1 = (se.x - this.anchor.x) * factor.x + this.anchor.x;
-							return;
-						}
-
-						target.move(Vector.from(x, nw.y));
-						target.resize(width, se.y - nw.y);
-						break;
-
-					case 'north':
-					case 'south':
-						if (target.type === 'segment') {
-							target.y = (nw.y - this.anchor.y) * factor.y + this.anchor.y;
-							target.y1 = (se.y - this.anchor.y) * factor.y + this.anchor.y;
-							return;
-						}
-
-						target.move(Vector.from(nw.x, y));
-						target.resize(se.x - nw.x, height);
-						break;
-
-					case 'nor-west':
-					case 'nor-east':
-					case 'south-west':
-					case 'south-east':
-						if (target.type === 'segment') {
-							const x = (nw.x - this.anchor.x) * factor.x + this.anchor.x;
-							const y = (nw.y - this.anchor.y) * factor.y + this.anchor.y;
-							const x1 = (se.x - this.anchor.x) * factor.x + this.anchor.x;
-							const y1 = (se.y - this.anchor.y) * factor.y + this.anchor.y;
-
-							target.x = x;
-							target.y = y;
-							target.x1 = x1;
-							target.y1 = y1;
-							return;
-						}
-
-						target.move(Vector.from(x, y));
-						target.resize(width, height);
-
-						break;
-				}
-
+				target.resize_as_group_context(handle, factor, keep_aspect_ratio);
 				target.normalize();
 			});
 
-			this.boundary = create_rectangular_bounding_box(this.targets);
+			this.boundary = RectangularBoundingBox.create(this.targets);
 
 			return;
 		}
 
 		const [target] = this.targets;
-		target.adjust(direction, mouse);
+		target.adjust(handle, mouse);
 		this.boundary = target.AABB;
 	}
 
@@ -272,7 +152,7 @@ export class Gizmo {
 				target.move(mouse.substract(target.offset));
 			});
 
-			this.boundary = create_rectangular_bounding_box(this.targets);
+			this.boundary = RectangularBoundingBox.create(this.targets);
 
 			return;
 		}
@@ -287,79 +167,81 @@ export class Gizmo {
 	}
 
 	set_anchor(v: Vector) {
-		if (this.targets.length < 2) return;
+		if (this.targets.length <= 1) return;
 
-		const [nw, , se] = this.boundary.vertices;
+		const x = this.boundary.x;
+		const y = this.boundary.y;
+		const width = this.boundary.width;
+		const height = this.boundary.height;
 
-		const x = nw.x;
-		const y = nw.y;
-		const width = se.x - nw.x;
-		const height = se.y - nw.y;
-
-		const side = this.boundary.get_handle_under_cursor(v);
+		const handle = this.boundary.get_handle_under_cursor(v);
 
 		const keep_aspect_ratio = this.targets.some((target) => target.angle !== 0);
 
+		const anchor = Vector.zero();
+
 		if (!keep_aspect_ratio) {
-			switch (side) {
+			switch (handle) {
 				case 'east':
-					this.anchor.set(x, y);
+					anchor.set(x, y);
 					break;
 				case 'west':
-					this.anchor.set(x + width, y);
+					anchor.set(x + width, y);
 					break;
 				case 'south':
-					this.anchor.set(x, y);
+					anchor.set(x, y);
 					break;
 				case 'north':
-					this.anchor.set(x, y + height);
+					anchor.set(x, y + height);
 					break;
 				case 'south-east':
-					this.anchor.set(x, y);
+					anchor.set(x, y);
 					break;
 				case 'south-west':
-					this.anchor.set(x + width, y);
+					anchor.set(x + width, y);
 					break;
 				case 'nor-west':
-					this.anchor.set(x + width, y + height);
+					anchor.set(x + width, y + height);
 					break;
 				case 'nor-east':
-					this.anchor.set(x, y + height);
+					anchor.set(x, y + height);
 					break;
 			}
-
-			return;
+		} else {
+			switch (handle) {
+				case 'south-west':
+					anchor.set(x + width, y);
+					break;
+				case 'nor-west':
+					anchor.set(x + width, y + height);
+					break;
+				case 'nor-east':
+					anchor.set(x, y + height);
+					break;
+				case 'south-east':
+					anchor.set(x, y);
+					break;
+				case 'east':
+					anchor.set(x, y + height / 2);
+					break;
+				case 'west':
+					anchor.set(x + width, y + height / 2);
+					break;
+				case 'north':
+					anchor.set(x + width / 2, y + height);
+					break;
+				case 'south':
+					anchor.set(x + width / 2, y);
+					break;
+			}
 		}
 
-		switch (side) {
-			case 'south-west':
-				this.anchor.set(x + width, y);
-				break;
-			case 'nor-west':
-				this.anchor.set(x + width, y + height);
-				break;
-			case 'nor-east':
-				this.anchor.set(x, y + height);
-				break;
-			case 'south-east':
-				this.anchor.set(x, y);
-				break;
-			case 'east':
-				this.anchor.set(x, y + height / 2);
-				break;
-			case 'west':
-				this.anchor.set(x + width, y + height / 2);
-				break;
-			case 'north':
-				this.anchor.set(x + width / 2, y + height);
-				break;
-			case 'south':
-				this.anchor.set(x + width / 2, y);
-				break;
-		}
+		this.targets.forEach((target) => target.anchor.set(anchor.x, anchor.y));
 	}
 
 	draw(c: CanvasRenderingContext2D, r: RoughCanvas) {
+		if (!this.targets.length) return;
+
 		if (this.targets.length > 1) {
 			this.boundary.draw(c);
 			return;

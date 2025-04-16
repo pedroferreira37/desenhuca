@@ -1,7 +1,7 @@
 import { RectangularBoundingBox } from '$lib/collision/rectangular-bounding-box';
 import { Vector } from '$lib/math/vector';
-import type { Direction, DrawOptions, Shape } from '$lib/types';
-import { uuid } from '$lib/util/util';
+import type { Handle, DrawOptions, Shape, ResizeReference } from '$lib/types';
+import { get_scaled_points_based_on_group_resize_ctx, uuid } from '$lib/util/util';
 import type { RoughCanvas } from 'roughjs/bin/canvas';
 import type { Options } from 'roughjs/bin/core';
 
@@ -16,7 +16,9 @@ export class Rectangle implements Shape {
 
 	public angle: number = 0;
 
-	public reference: Vector[] = [];
+	public history: ResizeReference | null = null;
+
+	public anchor: Vector = Vector.zero();
 
 	constructor(
 		private x: number = 0,
@@ -26,13 +28,42 @@ export class Rectangle implements Shape {
 		public options: DrawOptions
 	) {}
 
+	resize_as_group_context(handle: Handle, factor: Vector, keep_aspect_ratio: boolean) {
+		const history = this.history;
+
+		if (!history) return;
+
+		const [nw, se] = history.vertices;
+
+		const [x, y, width, height] = get_scaled_points_based_on_group_resize_ctx(
+			this.type,
+			handle,
+			nw,
+			se,
+			this.anchor,
+			factor,
+			keep_aspect_ratio
+		);
+
+		this.move(Vector.from(x, y));
+		this.resize(width, height);
+	}
+
+	save(entry: ResizeReference) {
+		this.history = entry;
+	}
+
 	move(v: Vector) {
 		this.x = v.x;
 		this.y = v.y;
 	}
 
 	rotate(angle: number) {
-		this.angle = angle;
+		const history = this.history;
+
+		if (!history) return;
+
+		this.angle = history.angle + angle;
 	}
 
 	intersects(v: Vector): boolean {
@@ -63,12 +94,12 @@ export class Rectangle implements Shape {
 		this.height = height;
 	}
 
-	adjust(direction: Direction, mouse: Vector) {
+	adjust(handle: Handle, mouse: Vector) {
 		const c = mouse;
 
 		const [nw, sw, se, ne] = this.vertices;
 
-		switch (direction) {
+		switch (handle) {
 			case 'south-west': {
 				const ne = Vector.from(this.x + this.width, this.y).rotate(
 					this.center.x,

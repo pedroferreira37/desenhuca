@@ -16,7 +16,7 @@ it('scale factor is calculated correctly', () => {
 	expect(expected.y).toBe(actual.y);
 });
 
-it('handles scaling only in x direction', () => {
+it('handles scaling only in x handle', () => {
 	const expected = Vector.from(2, 1);
 
 	const actual = calculateScaleFactor(
@@ -29,7 +29,7 @@ it('handles scaling only in x direction', () => {
 	expect(expected.y).toBe(actual.y);
 });
 
-it('handles scaling only in y direction', () => {
+it('handles scaling only in y handle', () => {
 	const expected = Vector.from(1, 2);
 
 	const actual = calculateScaleFactor(

@@ -1,5 +1,5 @@
 import { Vector } from '$lib/math/vector';
-import type { BoundingBox, Direction, Shape } from '$lib/types';
+import type { BoundingBox, Handle, Shape } from '$lib/types';
 import {
 	circle,
 	is_distance_close,
@@ -11,8 +11,8 @@ import type { RoughCanvas } from 'roughjs/bin/canvas';
 const SIZE = 12;
 const OFFSET = 12;
 
-const CORNERS: Direction[] = ['nor-west', 'south-west', 'south-east', 'nor-east'];
-const EDGES: Direction[] = ['north', 'south', 'west', 'east'];
+const CORNERS: Handle[] = ['nor-west', 'south-west', 'south-east', 'nor-east'];
+const EDGES: Handle[] = ['north', 'south', 'west', 'east'];
 
 export class RectangularBoundingBox implements BoundingBox {
 	constructor(
@@ -22,6 +22,31 @@ export class RectangularBoundingBox implements BoundingBox {
 		public y1: number = 0,
 		public angle: number = 0
 	) {}
+
+	static create(entries: Shape[]) {
+		let xmin = Infinity;
+		let xmax = -Infinity;
+		let ymin = Infinity;
+		let ymax = -Infinity;
+
+		entries.forEach((entry) => {
+			const vertices =
+				entry.angle !== 0
+					? entry.vertices.map((vertex) =>
+							vertex.rotate(entry.center.x, entry.center.y, entry.angle)
+						)
+					: entry.vertices;
+
+			vertices.forEach((vertex) => {
+				xmax = Math.max(xmax, vertex.x);
+				xmin = Math.min(xmin, vertex.x);
+				ymin = Math.min(ymin, vertex.y);
+				ymax = Math.max(ymax, vertex.y);
+			});
+		});
+
+		return new RectangularBoundingBox(xmin, ymin, xmax, ymax, 0);
+	}
 
 	get width(): number {
 		return this.x1 - this.x;
@@ -43,7 +68,7 @@ export class RectangularBoundingBox implements BoundingBox {
 		this.angle = angle;
 	}
 
-	get_handle_under_cursor(v: Vector): Direction | 'start' | 'end' | null {
+	get_handle_under_cursor(v: Vector): Handle | 'start' | 'end' | null {
 		const center = this.center;
 
 		const unrotated = v.rotate(center.x, center.y, -this.angle);

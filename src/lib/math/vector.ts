@@ -34,6 +34,10 @@ export class Vector {
 		return Vector.from(this.x / scalar, this.y / scalar);
 	}
 
+	multiply(v: Vector): Vector {
+		return Vector.from(this.x * v.x, this.y * v.y);
+	}
+
 	scale(scalar: number) {
 		this.x *= scalar;
 		this.y *= scalar;
